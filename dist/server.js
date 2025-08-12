@@ -174,8 +174,8 @@ app.post('/api/enhance-all', async (req, res) => {
 });
 // Schedule cron jobs
 const scheduleJobs = () => {
-    // Run duplicate scan every day at 2 AM
-    node_cron_1.default.schedule('0 2 * * *', async () => {
+    // Run duplicate scan every day at 1 AM
+    node_cron_1.default.schedule('0 1 * * *', async () => {
         try {
             console.log('Scheduled duplicate scan started at:', new Date().toISOString());
             const summary = await mealService.getDuplicatesSummary();
@@ -185,8 +185,8 @@ const scheduleJobs = () => {
             console.error('Scheduled duplicate scan failed:', error);
         }
     });
-    // Run comprehensive enhancement every day at 4 AM
-    node_cron_1.default.schedule('0 4 * * *', async () => {
+    // Run comprehensive enhancement every day at 5 AM
+    node_cron_1.default.schedule('0 5 * * *', async () => {
         try {
             console.log('Scheduled comprehensive enhancement started at:', new Date().toISOString());
             const results = {
@@ -242,8 +242,8 @@ const scheduleJobs = () => {
             console.error('Scheduled comprehensive enhancement failed:', error);
         }
     });
-    // Run duplicate transformations every Sunday at 3 AM
-    node_cron_1.default.schedule('0 3 * * 0', async () => {
+    // Run duplicate transformations daily at 3 AM
+    node_cron_1.default.schedule('0 3 * * *', async () => {
         try {
             console.log('Scheduled duplicate transformations started at:', new Date().toISOString());
             // Transform meal duplicates
