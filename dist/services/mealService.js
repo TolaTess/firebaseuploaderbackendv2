@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.MealService = void 0;
 const firestore_1 = require("firebase/firestore");
 const firebase_1 = require("../config/firebase");
-const geminiService_1 = require("./geminiService");
+const geminiService_1 = require("../services/geminiService");
 class MealService {
     constructor() {
         this.collectionRef = (0, firestore_1.collection)(firebase_1.db, 'meals');

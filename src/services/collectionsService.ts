@@ -1,4 +1,4 @@
-import { collection, getDocs, updateDoc, doc, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, Timestamp, addDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { CookingMethod, DietCategory, Program, PortionDetail } from '../types/collections';
 import { GeminiService } from './geminiService';
@@ -194,12 +194,12 @@ export class CollectionsService {
   }
 
   /**
-   * Updates programs with portion details using Gemini AI
+   * Updates programs with comprehensive details using Gemini AI
    * @returns Promise<number> Number of programs updated
    */
   async updateProgramsWithPortionDetails(): Promise<number> {
     try {
-      const programsToUpdate = await this.getProgramsNeedingPortionDetails();
+      const programsToUpdate = await this.getProgramsNeedingEnhancement();
       let updatedCount = 0;
 
       for (const program of programsToUpdate) {
@@ -241,6 +241,183 @@ export class CollectionsService {
       return updatedCount;
     } catch (error) {
       console.error('Error updating programs with Gemini enhancement:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Creates all program types using Gemini AI
+   * @returns Promise<number> Number of programs created
+   */
+  async createAllPrograms(): Promise<number> {
+    const programTypes: Program['type'][] = [
+      'Balanced',
+      'Intermittent fasting',
+      'Gut health',
+      'Hormonal health',
+      '8+8+8 rule',
+      'No sugar Days challenge'
+    ];
+
+    let createdCount = 0;
+
+    for (const programType of programTypes) {
+      try {
+        console.log(`Creating program: ${programType}`);
+        
+        // Check if program already exists
+        const existingPrograms = await getDocs(this.programsRef);
+        const exists = existingPrograms.docs.some(doc => {
+          const data = doc.data() as FirestoreProgram;
+          return data.type === programType;
+        });
+
+        if (exists) {
+          console.log(`Program "${programType}" already exists, skipping...`);
+          continue;
+        }
+
+        // Use Gemini to create program details
+        const enhancedData = await this.geminiService.createProgram(programType);
+
+        const programData: Omit<FirestoreProgram, 'id'> = {
+          name: enhancedData.name,
+          type: programType,
+          description: enhancedData.description,
+          duration: enhancedData.duration,
+          goals: enhancedData.goals,
+          mealPlan: enhancedData.mealPlan,
+          fitnessProgram: enhancedData.fitnessProgram,
+          guidelines: enhancedData.guidelines,
+          benefits: enhancedData.benefits,
+          difficulty: enhancedData.difficulty,
+          tips: enhancedData.tips,
+          notAllowed: enhancedData.notAllowed,
+          portionDetails: enhancedData.portionDetails,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now()
+        };
+
+        await addDoc(this.programsRef, programData);
+        createdCount++;
+        console.log(`Successfully created program: ${enhancedData.name}`);
+        
+        // Delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+      } catch (error) {
+        console.error(`Error creating program ${programType}:`, error);
+        // Continue with other programs even if one fails
+      }
+    }
+
+    return createdCount;
+  }
+
+  /**
+   * Creates routines for existing programs that don't have them
+   * @returns Promise<number> Number of programs updated with routines
+   */
+  async createProgramRoutines(): Promise<number> {
+    try {
+      console.log('Fetching programs from Firebase collection: programs');
+      const allPrograms = await getDocs(this.programsRef);
+      console.log(`Found ${allPrograms.size} total programs in collection`);
+      
+      const programsToUpdate: (FirestoreProgram & { id: string })[] = [];
+
+      allPrograms.forEach((doc) => {
+        const data = doc.data() as FirestoreProgram;
+        
+        // Check if program needs a routine
+        if (!data.routine || data.routine.length === 0) {
+          console.log(`Program "${data.name}" needs a routine`);
+          programsToUpdate.push({
+            ...data,
+            id: doc.id
+          });
+        }
+      });
+
+      console.log(`${programsToUpdate.length} programs need routines`);
+      
+      let updatedCount = 0;
+
+      for (const program of programsToUpdate) {
+        try {
+          console.log(`Creating routine for program: ${program.name}`);
+          
+          // Convert Firestore program to Program type for Gemini
+          const programForGemini: Program = {
+            id: program.id,
+            name: program.name,
+            type: program.type,
+            description: program.description,
+            duration: program.duration,
+            goals: program.goals,
+            mealPlan: program.mealPlan,
+            fitnessProgram: program.fitnessProgram,
+            guidelines: program.guidelines,
+            benefits: program.benefits,
+            difficulty: program.difficulty,
+            tips: program.tips,
+            routine: program.routine,
+            notAllowed: program.notAllowed,
+            portionDetails: program.portionDetails,
+            createdAt: program.createdAt.toDate(),
+            updatedAt: program.updatedAt.toDate()
+          };
+          
+          // Use Gemini to create routine
+          const routine = await this.geminiService.createProgramRoutine(programForGemini);
+
+          const updates: Partial<FirestoreProgram> = {
+            routine: routine,
+            updatedAt: Timestamp.now()
+          };
+
+          await updateDoc(doc(this.programsRef, program.id), updates);
+          updatedCount++;
+          console.log(`Successfully created routine for program "${program.name}" with ${routine.length} items`);
+          
+          // Small delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+        } catch (error) {
+          console.error(`Error creating routine for program ${program.id}:`, error);
+          // Continue with other programs even if one fails
+        }
+      }
+
+      return updatedCount;
+    } catch (error) {
+      console.error('Error creating program routines:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Gets a summary of existing programs
+   */
+  async getProgramsSummary(): Promise<{total: number, programs: {name: string, type: Program['type']}[]}> {
+    try {
+      const allPrograms = await getDocs(this.programsRef);
+      const programs: {name: string, type: Program['type']}[] = [];
+
+      allPrograms.forEach((doc) => {
+        const data = doc.data() as FirestoreProgram;
+        programs.push({
+          name: data.name,
+          type: data.type
+        });
+      });
+
+      return {
+        total: allPrograms.size,
+        programs: programs
+      };
+    } catch (error) {
+      console.error('Error getting programs summary:', error);
       throw error;
     }
   }
@@ -327,10 +504,10 @@ export class CollectionsService {
   }
 
   /**
-   * Retrieves programs that need portion details
+   * Retrieves programs that need enhancement with missing details
    * @returns Promise<FirestoreProgram[]>
    */
-  private async getProgramsNeedingPortionDetails(): Promise<FirestoreProgram[]> {
+  private async getProgramsNeedingEnhancement(): Promise<FirestoreProgram[]> {
     try {
       console.log('Fetching programs from Firebase collection: programs');
       const allPrograms = await getDocs(this.programsRef);
@@ -345,23 +522,50 @@ export class CollectionsService {
           id: doc.id
         };
 
-        // Check if program needs portion details
-        const needsPortionDetails = 
+        // Check if program needs enhancement (missing any major details)
+        const needsEnhancement = 
+          !programData.description ||
+          !programData.duration ||
+          !programData.goals ||
+          programData.goals.length === 0 ||
+          !programData.mealPlan ||
+          !programData.mealPlan.overview ||
+          !programData.fitnessProgram ||
+          !programData.fitnessProgram.overview ||
+          !programData.guidelines ||
+          programData.guidelines.length === 0 ||
+          !programData.benefits ||
+          programData.benefits.length === 0 ||
+          !programData.difficulty ||
+          !programData.tips ||
+          programData.tips.length === 0 ||
           !programData.notAllowed ||
           programData.notAllowed.length === 0 ||
           !programData.portionDetails ||
           Object.keys(programData.portionDetails).length === 0;
 
-        if (needsPortionDetails) {
-          console.log(`Program "${programData.name}" needs portion details`);
+        if (needsEnhancement) {
+          console.log(`Program "${programData.name}" needs enhancement:`, {
+            hasDescription: !!programData.description,
+            hasDuration: !!programData.duration,
+            hasGoals: !!(programData.goals && programData.goals.length > 0),
+            hasMealPlan: !!(programData.mealPlan && programData.mealPlan.overview),
+            hasFitnessProgram: !!(programData.fitnessProgram && programData.fitnessProgram.overview),
+            hasGuidelines: !!(programData.guidelines && programData.guidelines.length > 0),
+            hasBenefits: !!(programData.benefits && programData.benefits.length > 0),
+            hasDifficulty: !!programData.difficulty,
+            hasTips: !!(programData.tips && programData.tips.length > 0),
+            hasNotAllowed: !!(programData.notAllowed && programData.notAllowed.length > 0),
+            hasPortionDetails: !!(programData.portionDetails && Object.keys(programData.portionDetails).length > 0)
+          });
           programs.push(programData);
         }
       });
 
-      console.log(`${programs.length} programs need portion details`);
+      console.log(`${programs.length} programs need enhancement`);
       return programs;
     } catch (error) {
-      console.error('Error getting programs needing portion details:', error);
+      console.error('Error getting programs needing enhancement:', error);
       throw error;
     }
   }

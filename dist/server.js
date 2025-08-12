@@ -80,6 +80,18 @@ app.post('/api/transform-ingredient-duplicates', async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+app.post('/api/generate-ingredients', async (req, res) => {
+    try {
+        console.log('Manual ingredient generation triggered');
+        const { protein = 0, vegetable = 0, fruit = 0, grain = 0 } = req.body;
+        const count = await ingredientService.generateNewIngredients({ protein, vegetable, fruit, grain });
+        res.json({ success: true, generatedCount: count });
+    }
+    catch (error) {
+        console.error('Error generating ingredients:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 // Collections enhancement endpoints
 app.post('/api/enhance-cooking-methods', async (req, res) => {
     try {
@@ -114,6 +126,39 @@ app.post('/api/enhance-programs', async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+app.post('/api/create-programs', async (req, res) => {
+    try {
+        console.log('Manual program creation triggered');
+        const count = await collectionsService.createAllPrograms();
+        res.json({ success: true, createdCount: count });
+    }
+    catch (error) {
+        console.error('Error creating programs:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+app.post('/api/create-routines', async (req, res) => {
+    try {
+        console.log('Manual routine creation triggered');
+        const count = await collectionsService.createProgramRoutines();
+        res.json({ success: true, updatedCount: count });
+    }
+    catch (error) {
+        console.error('Error creating routines:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+app.get('/api/programs-summary', async (req, res) => {
+    try {
+        console.log('Programs summary requested');
+        const summary = await collectionsService.getProgramsSummary();
+        res.json({ success: true, summary });
+    }
+    catch (error) {
+        console.error('Error getting programs summary:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 // Comprehensive enhancement endpoint
 app.post('/api/enhance-all', async (req, res) => {
     try {
@@ -123,7 +168,8 @@ app.post('/api/enhance-all', async (req, res) => {
             ingredients: 0,
             cookingMethods: 0,
             dietCategories: 0,
-            programs: 0
+            programs: 0,
+            routines: 0
         };
         // Enhance meals
         try {
@@ -165,6 +211,14 @@ app.post('/api/enhance-all', async (req, res) => {
         catch (error) {
             console.error('Error enhancing programs:', error);
         }
+        // Create routines for programs
+        try {
+            results.routines = await collectionsService.createProgramRoutines();
+            console.log(`Created routines for ${results.routines} programs`);
+        }
+        catch (error) {
+            console.error('Error creating routines:', error);
+        }
         res.json({ success: true, results });
     }
     catch (error) {
@@ -185,16 +239,70 @@ const scheduleJobs = () => {
             console.error('Scheduled duplicate scan failed:', error);
         }
     });
-    // Run comprehensive enhancement every day at 5 AM
-    node_cron_1.default.schedule('0 5 * * *', async () => {
+    // Run duplicate transformations every day at 2 AM
+    node_cron_1.default.schedule('0 2 * * *', async () => {
+        try {
+            console.log('Scheduled duplicate transformations started at:', new Date().toISOString());
+            // Transform meal duplicates
+            try {
+                const mealCount = await mealService.transformDuplicatesIntoVariations();
+                console.log('Meal duplicate transformation completed:', mealCount, 'meals transformed');
+            }
+            catch (error) {
+                console.error('Error transforming meal duplicates:', error);
+            }
+            // Transform ingredient duplicates
+            try {
+                const ingredientCount = await ingredientService.transformDuplicatesIntoVariations();
+                console.log('Ingredient duplicate transformation completed:', ingredientCount, 'ingredients transformed');
+            }
+            catch (error) {
+                console.error('Error transforming ingredient duplicates:', error);
+            }
+        }
+        catch (error) {
+            console.error('Scheduled duplicate transformations failed:', error);
+        }
+    });
+    // Run program updates every day at 3 AM
+    node_cron_1.default.schedule('0 3 * * *', async () => {
+        try {
+            console.log('Scheduled program updates started at:', new Date().toISOString());
+            const results = {
+                programs: 0,
+                routines: 0
+            };
+            // Enhance programs
+            try {
+                results.programs = await collectionsService.updateProgramsWithPortionDetails();
+                console.log(`Enhanced ${results.programs} programs`);
+            }
+            catch (error) {
+                console.error('Error enhancing programs:', error);
+            }
+            // Create routines for programs
+            try {
+                results.routines = await collectionsService.createProgramRoutines();
+                console.log(`Created routines for ${results.routines} programs`);
+            }
+            catch (error) {
+                console.error('Error creating routines:', error);
+            }
+            console.log('Program updates completed:', results);
+        }
+        catch (error) {
+            console.error('Scheduled program updates failed:', error);
+        }
+    });
+    // Run comprehensive enhancement (excluding programs) every day at 4 AM 
+    node_cron_1.default.schedule('0 4 * * *', async () => {
         try {
             console.log('Scheduled comprehensive enhancement started at:', new Date().toISOString());
             const results = {
                 meals: 0,
                 ingredients: 0,
                 cookingMethods: 0,
-                dietCategories: 0,
-                programs: 0
+                dietCategories: 0
             };
             // Enhance meals
             try {
@@ -228,43 +336,10 @@ const scheduleJobs = () => {
             catch (error) {
                 console.error('Error enhancing diet categories:', error);
             }
-            // Enhance programs
-            try {
-                results.programs = await collectionsService.updateProgramsWithPortionDetails();
-                console.log(`Enhanced ${results.programs} programs`);
-            }
-            catch (error) {
-                console.error('Error enhancing programs:', error);
-            }
             console.log('Comprehensive enhancement completed:', results);
         }
         catch (error) {
             console.error('Scheduled comprehensive enhancement failed:', error);
-        }
-    });
-    // Run duplicate transformations daily at 3 AM
-    node_cron_1.default.schedule('0 3 * * *', async () => {
-        try {
-            console.log('Scheduled duplicate transformations started at:', new Date().toISOString());
-            // Transform meal duplicates
-            try {
-                const mealCount = await mealService.transformDuplicatesIntoVariations();
-                console.log('Meal duplicate transformation completed:', mealCount, 'meals transformed');
-            }
-            catch (error) {
-                console.error('Error transforming meal duplicates:', error);
-            }
-            // Transform ingredient duplicates
-            try {
-                const ingredientCount = await ingredientService.transformDuplicatesIntoVariations();
-                console.log('Ingredient duplicate transformation completed:', ingredientCount, 'ingredients transformed');
-            }
-            catch (error) {
-                console.error('Error transforming ingredient duplicates:', error);
-            }
-        }
-        catch (error) {
-            console.error('Scheduled duplicate transformations failed:', error);
         }
     });
     console.log('Cron jobs scheduled successfully');

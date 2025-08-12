@@ -283,5 +283,65 @@ class IngredientService {
         // Only exact match after normalization
         return norm1 === norm2 && norm1.length > 0;
     }
+    /**
+     * Generates new ingredients of specified types using Gemini AI
+     * @returns Promise<number> Number of ingredients generated
+     */
+    async generateNewIngredients(quantities) {
+        try {
+            console.log('Starting new ingredient generation...');
+            // Get all existing titles to avoid duplicates
+            const allIngredients = await (0, firestore_1.getDocs)(this.collectionRef);
+            const existingTitles = Array.from(allIngredients.docs.map(doc => doc.data().title));
+            let totalAdded = 0;
+            // Generate ingredients for each type
+            for (const [ingredientType, quantity] of Object.entries(quantities)) {
+                if (quantity <= 0)
+                    continue;
+                console.log(`Generating ${quantity} new ${ingredientType} ingredients...`);
+                for (let i = 0; i < quantity; i++) {
+                    try {
+                        // Add delay to prevent API rate limiting
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        // Generate a new unique ingredient
+                        const newIngredient = await this.geminiService.generateNewIngredient(ingredientType, existingTitles);
+                        // Add to Firebase
+                        await (0, firestore_1.addDoc)(this.collectionRef, {
+                            title: newIngredient.title || `New ${ingredientType}`,
+                            type: newIngredient.type,
+                            mediaPaths: [],
+                            calories: newIngredient.calories || 0,
+                            macros: newIngredient.macros || { protein: '0g', carbs: '0g', fat: '0g' },
+                            categories: newIngredient.categories || [],
+                            features: newIngredient.features || { fiber: '0g', g_i: '0', season: 'all year', water: '0%', rainbow: 'white' },
+                            techniques: newIngredient.techniques || [],
+                            storageOptions: newIngredient.storageOptions || { countertop: 'Not recommended', fridge: '1 week', freezer: '1 month' },
+                            isAntiInflammatory: newIngredient.isAntiInflammatory || false,
+                            isSelected: false,
+                            alt: newIngredient.alt || [],
+                            image: newIngredient.image || '',
+                            createdAt: firestore_1.Timestamp.now(),
+                            updatedAt: firestore_1.Timestamp.now()
+                        });
+                        // Add the new title to existing titles to avoid duplicates in the same batch
+                        if (newIngredient.title) {
+                            existingTitles.push(newIngredient.title);
+                        }
+                        totalAdded++;
+                    }
+                    catch (error) {
+                        console.error(`Error generating ${ingredientType} ingredient ${i + 1}:`, error);
+                        // Continue with the next ingredient
+                    }
+                }
+            }
+            console.log(`Ingredient generation complete. ${totalAdded} new ingredients added.`);
+            return totalAdded;
+        }
+        catch (error) {
+            console.error('Error generating new ingredients:', error);
+            throw error;
+        }
+    }
 }
 exports.IngredientService = IngredientService;
