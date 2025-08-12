@@ -1,0 +1,270 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.CollectionsService = void 0;
+const firestore_1 = require("firebase/firestore");
+const firebase_1 = require("../config/firebase");
+const geminiService_1 = require("./geminiService");
+class CollectionsService {
+    constructor() {
+        this.cookingMethodsRef = (0, firestore_1.collection)(firebase_1.db, 'cookingMethods');
+        this.dietCategoriesRef = (0, firestore_1.collection)(firebase_1.db, 'dietCategories');
+        this.programsRef = (0, firestore_1.collection)(firebase_1.db, 'programs');
+        this.geminiService = new geminiService_1.GeminiService();
+    }
+    /**
+     * Enhances cooking methods with comprehensive details using Gemini AI
+     * @returns Promise<number> Number of cooking methods updated
+     */
+    async enhanceCookingMethods() {
+        try {
+            const cookingMethodsToUpdate = await this.getCookingMethodsNeedingEnhancement();
+            let updatedCount = 0;
+            for (const cookingMethod of cookingMethodsToUpdate) {
+                try {
+                    console.log(`Enhancing cooking method: ${cookingMethod.name}`);
+                    // Use Gemini to enhance cooking method details
+                    const enhancedData = await this.geminiService.enhanceCookingMethod({
+                        name: cookingMethod.name,
+                        description: cookingMethod.description,
+                        howItWorks: cookingMethod.howItWorks,
+                        equipment: cookingMethod.equipment,
+                        bestFor: cookingMethod.bestFor,
+                        heatType: cookingMethod.heatType
+                    });
+                    const updates = {
+                        updatedAt: firestore_1.Timestamp.now()
+                    };
+                    // Update fields with enhanced data
+                    if (enhancedData.description && !cookingMethod.description) {
+                        updates.description = enhancedData.description;
+                    }
+                    if (enhancedData.howItWorks && !cookingMethod.howItWorks) {
+                        updates.howItWorks = enhancedData.howItWorks;
+                    }
+                    if (enhancedData.equipment && (!cookingMethod.equipment || cookingMethod.equipment.length === 0)) {
+                        updates.equipment = enhancedData.equipment;
+                    }
+                    if (enhancedData.bestFor && (!cookingMethod.bestFor || cookingMethod.bestFor.length === 0)) {
+                        updates.bestFor = enhancedData.bestFor;
+                    }
+                    if (enhancedData.heatType && !cookingMethod.heatType) {
+                        updates.heatType = enhancedData.heatType;
+                    }
+                    // Update the cooking method if we have new information
+                    if (Object.keys(updates).length > 1 && cookingMethod.id) { // More than just updatedAt
+                        await (0, firestore_1.updateDoc)((0, firestore_1.doc)(this.cookingMethodsRef, cookingMethod.id), updates);
+                        updatedCount++;
+                        console.log(`Successfully updated cooking method ${cookingMethod.id} with Gemini enhancements`);
+                    }
+                    // Small delay to avoid rate limiting
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+                catch (error) {
+                    console.error(`Error enhancing cooking method ${cookingMethod.id}:`, error);
+                    // Continue with other cooking methods even if one fails
+                }
+            }
+            return updatedCount;
+        }
+        catch (error) {
+            console.error('Error updating cooking methods with Gemini enhancement:', error);
+            throw error;
+        }
+    }
+    /**
+     * Enhances diet categories with comprehensive details using Gemini AI
+     * @returns Promise<number> Number of diet categories updated
+     */
+    async enhanceDietCategories() {
+        try {
+            const dietCategoriesToUpdate = await this.getDietCategoriesNeedingEnhancement();
+            let updatedCount = 0;
+            for (const dietCategory of dietCategoriesToUpdate) {
+                try {
+                    console.log(`Enhancing diet category: ${dietCategory.name}`);
+                    // Use Gemini to enhance diet category details
+                    const enhancedData = await this.geminiService.enhanceDietCategory({
+                        name: dietCategory.name,
+                        description: dietCategory.description,
+                        kidsFriendly: dietCategory.kidsFriendly
+                    });
+                    const updates = {
+                        updatedAt: firestore_1.Timestamp.now()
+                    };
+                    // Update fields with enhanced data
+                    if (enhancedData.description && !dietCategory.description) {
+                        updates.description = enhancedData.description;
+                    }
+                    if (enhancedData.kidsFriendly !== undefined && dietCategory.kidsFriendly === undefined) {
+                        updates.kidsFriendly = enhancedData.kidsFriendly;
+                    }
+                    // Update the diet category if we have new information
+                    if (Object.keys(updates).length > 1 && dietCategory.id) { // More than just updatedAt
+                        await (0, firestore_1.updateDoc)((0, firestore_1.doc)(this.dietCategoriesRef, dietCategory.id), updates);
+                        updatedCount++;
+                        console.log(`Successfully updated diet category ${dietCategory.id} with Gemini enhancements`);
+                    }
+                    // Small delay to avoid rate limiting
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+                catch (error) {
+                    console.error(`Error enhancing diet category ${dietCategory.id}:`, error);
+                    // Continue with other diet categories even if one fails
+                }
+            }
+            return updatedCount;
+        }
+        catch (error) {
+            console.error('Error updating diet categories with Gemini enhancement:', error);
+            throw error;
+        }
+    }
+    /**
+     * Updates programs with portion details using Gemini AI
+     * @returns Promise<number> Number of programs updated
+     */
+    async updateProgramsWithPortionDetails() {
+        try {
+            const programsToUpdate = await this.getProgramsNeedingPortionDetails();
+            let updatedCount = 0;
+            for (const program of programsToUpdate) {
+                try {
+                    console.log(`Enhancing program: ${program.name}`);
+                    // Use Gemini to enhance program portion details
+                    const enhancedData = await this.geminiService.enhanceProgramPortionDetails(program);
+                    const updates = {
+                        updatedAt: firestore_1.Timestamp.now()
+                    };
+                    // Update fields with enhanced data
+                    if (enhancedData.notAllowed && (!program.notAllowed || program.notAllowed.length === 0)) {
+                        updates.notAllowed = enhancedData.notAllowed;
+                    }
+                    if (enhancedData.portionDetails && (!program.portionDetails || Object.keys(program.portionDetails).length === 0)) {
+                        updates.portionDetails = enhancedData.portionDetails;
+                    }
+                    // Update the program if we have new information
+                    if (Object.keys(updates).length > 1 && program.id) { // More than just updatedAt
+                        await (0, firestore_1.updateDoc)((0, firestore_1.doc)(this.programsRef, program.id), updates);
+                        updatedCount++;
+                        console.log(`Successfully updated program ${program.id} with Gemini enhancements`);
+                    }
+                    // Small delay to avoid rate limiting
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+                catch (error) {
+                    console.error(`Error enhancing program ${program.id}:`, error);
+                    // Continue with other programs even if one fails
+                }
+            }
+            return updatedCount;
+        }
+        catch (error) {
+            console.error('Error updating programs with Gemini enhancement:', error);
+            throw error;
+        }
+    }
+    /**
+     * Retrieves cooking methods that need enhancement with missing details
+     * @returns Promise<FirestoreCookingMethod[]>
+     */
+    async getCookingMethodsNeedingEnhancement() {
+        try {
+            console.log('Fetching cooking methods from Firebase collection: cookingMethods');
+            const allCookingMethods = await (0, firestore_1.getDocs)(this.cookingMethodsRef);
+            console.log(`Found ${allCookingMethods.size} total cooking methods in collection`);
+            const cookingMethods = [];
+            allCookingMethods.forEach((doc) => {
+                const data = doc.data();
+                const cookingMethodData = {
+                    ...data,
+                    id: doc.id
+                };
+                // Check if cooking method needs enhancement
+                const needsEnhancement = !cookingMethodData.description ||
+                    !cookingMethodData.howItWorks ||
+                    !cookingMethodData.equipment ||
+                    cookingMethodData.equipment.length === 0 ||
+                    !cookingMethodData.bestFor ||
+                    cookingMethodData.bestFor.length === 0 ||
+                    !cookingMethodData.heatType;
+                if (needsEnhancement) {
+                    console.log(`Cooking method "${cookingMethodData.name}" needs enhancement`);
+                    cookingMethods.push(cookingMethodData);
+                }
+            });
+            console.log(`${cookingMethods.length} cooking methods need enhancement`);
+            return cookingMethods;
+        }
+        catch (error) {
+            console.error('Error getting cooking methods needing enhancement:', error);
+            throw error;
+        }
+    }
+    /**
+     * Retrieves diet categories that need enhancement with missing details
+     * @returns Promise<FirestoreDietCategory[]>
+     */
+    async getDietCategoriesNeedingEnhancement() {
+        try {
+            console.log('Fetching diet categories from Firebase collection: dietCategories');
+            const allDietCategories = await (0, firestore_1.getDocs)(this.dietCategoriesRef);
+            console.log(`Found ${allDietCategories.size} total diet categories in collection`);
+            const dietCategories = [];
+            allDietCategories.forEach((doc) => {
+                const data = doc.data();
+                const dietCategoryData = {
+                    ...data,
+                    id: doc.id
+                };
+                // Check if diet category needs enhancement
+                const needsEnhancement = !dietCategoryData.description ||
+                    dietCategoryData.kidsFriendly === undefined;
+                if (needsEnhancement) {
+                    console.log(`Diet category "${dietCategoryData.name}" needs enhancement`);
+                    dietCategories.push(dietCategoryData);
+                }
+            });
+            console.log(`${dietCategories.length} diet categories need enhancement`);
+            return dietCategories;
+        }
+        catch (error) {
+            console.error('Error getting diet categories needing enhancement:', error);
+            throw error;
+        }
+    }
+    /**
+     * Retrieves programs that need portion details
+     * @returns Promise<FirestoreProgram[]>
+     */
+    async getProgramsNeedingPortionDetails() {
+        try {
+            console.log('Fetching programs from Firebase collection: programs');
+            const allPrograms = await (0, firestore_1.getDocs)(this.programsRef);
+            console.log(`Found ${allPrograms.size} total programs in collection`);
+            const programs = [];
+            allPrograms.forEach((doc) => {
+                const data = doc.data();
+                const programData = {
+                    ...data,
+                    id: doc.id
+                };
+                // Check if program needs portion details
+                const needsPortionDetails = !programData.notAllowed ||
+                    programData.notAllowed.length === 0 ||
+                    !programData.portionDetails ||
+                    Object.keys(programData.portionDetails).length === 0;
+                if (needsPortionDetails) {
+                    console.log(`Program "${programData.name}" needs portion details`);
+                    programs.push(programData);
+                }
+            });
+            console.log(`${programs.length} programs need portion details`);
+            return programs;
+        }
+        catch (error) {
+            console.error('Error getting programs needing portion details:', error);
+            throw error;
+        }
+    }
+}
+exports.CollectionsService = CollectionsService;
