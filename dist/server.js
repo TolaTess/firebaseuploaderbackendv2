@@ -265,35 +265,39 @@ const scheduleJobs = () => {
         }
     });
     // Run program updates every day at 3 AM
-    node_cron_1.default.schedule('0 3 * * *', async () => {
+    // COMMENTED OUT - Program scheduling disabled
+    /*
+    cron.schedule('0 3 * * *', async () => {
+      try {
+        console.log('Scheduled program updates started at:', new Date().toISOString());
+        
+        const results = {
+          programs: 0,
+          routines: 0
+        };
+  
+        // Enhance programs
         try {
-            console.log('Scheduled program updates started at:', new Date().toISOString());
-            const results = {
-                programs: 0,
-                routines: 0
-            };
-            // Enhance programs
-            try {
-                results.programs = await collectionsService.updateProgramsWithPortionDetails();
-                console.log(`Enhanced ${results.programs} programs`);
-            }
-            catch (error) {
-                console.error('Error enhancing programs:', error);
-            }
-            // Create routines for programs
-            try {
-                results.routines = await collectionsService.createProgramRoutines();
-                console.log(`Created routines for ${results.routines} programs`);
-            }
-            catch (error) {
-                console.error('Error creating routines:', error);
-            }
-            console.log('Program updates completed:', results);
+          results.programs = await collectionsService.updateProgramsWithPortionDetails();
+          console.log(`Enhanced ${results.programs} programs`);
+        } catch (error) {
+          console.error('Error enhancing programs:', error);
         }
-        catch (error) {
-            console.error('Scheduled program updates failed:', error);
+  
+        // Create routines for programs
+        try {
+          results.routines = await collectionsService.createProgramRoutines();
+          console.log(`Created routines for ${results.routines} programs`);
+        } catch (error) {
+          console.error('Error creating routines:', error);
         }
+  
+        console.log('Program updates completed:', results);
+      } catch (error) {
+        console.error('Scheduled program updates failed:', error);
+      }
     });
+    */
     // Run comprehensive enhancement (excluding programs) every day at 4 AM 
     node_cron_1.default.schedule('0 4 * * *', async () => {
         try {

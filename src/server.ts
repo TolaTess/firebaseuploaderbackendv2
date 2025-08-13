@@ -269,6 +269,8 @@ const scheduleJobs = () => {
   });
 
   // Run program updates every day at 3 AM
+  // COMMENTED OUT - Program scheduling disabled
+  /*
   cron.schedule('0 3 * * *', async () => {
     try {
       console.log('Scheduled program updates started at:', new Date().toISOString());
@@ -299,6 +301,7 @@ const scheduleJobs = () => {
       console.error('Scheduled program updates failed:', error);
     }
   });
+  */
 
   // Run comprehensive enhancement (excluding programs) every day at 4 AM 
   cron.schedule('0 4 * * *', async () => {
