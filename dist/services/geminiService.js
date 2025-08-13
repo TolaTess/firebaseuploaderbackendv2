@@ -383,7 +383,7 @@ class GeminiService {
                     // On final attempt, try to create a basic fallback response
                     console.log(`Creating fallback response for program: ${program.name}`);
                     return {
-                        notAllowed: ['fallback'],
+                        notAllowed: ['snack'], // Use valid option instead of 'fallback'
                         portionDetails: {
                             'fallback': {
                                 palmPercentage: 'unknown',
@@ -633,7 +633,11 @@ Return a valid JSON object with the following structure (ensure all property nam
   }
 }
 
-IMPORTANT: Return ONLY the JSON object. Do not include any code examples, explanations, or other text. The response should be valid JSON that can be parsed directly.
+IMPORTANT RULES:
+1. Return ONLY the JSON object. Do not include any code examples, explanations, or other text.
+2. The "notAllowed" array can ONLY contain these 4 options: "snack", "fruit", "dessert", "alcohol"
+3. Choose the most appropriate option(s) based on the program's focus and goals.
+4. The response should be valid JSON that can be parsed directly.
 
 Example structure for portionDetails:
 - "protein": {"palmPercentage": "1 palm", "spatulaSize": "1 spatula", "examples": ["chicken", "fish"], "calories": "300"}
@@ -669,7 +673,11 @@ Return a valid JSON object with the following structure (ensure all property nam
   }
 }
 
-IMPORTANT: Return ONLY the JSON object. Do not include any code examples, explanations, or other text. The response should be valid JSON that can be parsed directly.
+IMPORTANT RULES:
+1. Return ONLY the JSON object. Do not include any code examples, explanations, or other text.
+2. The "notAllowed" array can ONLY contain these 4 options: "snack", "fruit", "dessert", "alcohol"
+3. Choose the most appropriate option(s) based on the program type and goals.
+4. The response should be valid JSON that can be parsed directly.
 
 Ensure the JSON is properly formatted with double quotes around all property names and string values.`;
     }
@@ -878,14 +886,6 @@ Ensure the JSON is properly formatted with double quotes around all property nam
         cleaned = cleaned.replace(/'/g, '"');
         // Fix trailing commas
         cleaned = cleaned.replace(/,(\s*[}\]])/g, '$1');
-        // Fix missing quotes around string values that contain special characters
-        cleaned = cleaned.replace(/:\s*([^"][^,}\]]*[^"\s,}\]])/g, (match, value) => {
-            // Only quote if it's not already quoted and contains special characters
-            if (!value.includes('"') && (value.includes(' ') || value.includes('-') || value.includes('/') || value.includes('(') || value.includes(')') || value.includes('&'))) {
-                return `: "${value.trim()}"`;
-            }
-            return match;
-        });
         // Fix boolean values that might be strings
         cleaned = cleaned.replace(/"true"/g, 'true');
         cleaned = cleaned.replace(/"false"/g, 'false');
@@ -911,38 +911,6 @@ Ensure the JSON is properly formatted with double quotes around all property nam
         for (let i = 0; i < openBrackets - closeBrackets; i++) {
             cleaned += ']';
         }
-        // Fix common issues with nested objects and arrays
-        cleaned = cleaned.replace(/:\s*\[([^\]]*)\]/g, (match, content) => {
-            // Ensure array content is properly formatted
-            const items = content.split(',').map((item) => item.trim());
-            const formattedItems = items.map((item) => {
-                if (item.startsWith('"') && item.endsWith('"')) {
-                    return item; // Already quoted
-                }
-                else if (item.match(/^\d+$/)) {
-                    return item; // Number
-                }
-                else if (item === 'true' || item === 'false') {
-                    return item; // Boolean
-                }
-                else {
-                    return `"${item}"`; // Quote strings
-                }
-            });
-            return `: [${formattedItems.join(', ')}]`;
-        });
-        // Fix issues with object properties that might be missing quotes
-        cleaned = cleaned.replace(/"([^"]+)"\s*:\s*([^,}\]]+)/g, (match, key, value) => {
-            if (value.trim().startsWith('"') && value.trim().endsWith('"')) {
-                return match; // Already properly quoted
-            }
-            else if (value.trim().match(/^(true|false|\d+(?:\.\d+)?)$/)) {
-                return match; // Boolean or number
-            }
-            else {
-                return `"${key}": "${value.trim()}"`;
-            }
-        });
         return cleaned;
     }
     parseProgramPortionDetailsResponse(response) {
@@ -955,7 +923,19 @@ Ensure the JSON is properly formatted with double quotes around all property nam
             if (jsonMatch) {
                 cleanedResponse = jsonMatch[0];
             }
-            // Fix common JSON issues
+            // First, try to parse the JSON as-is to see if it's already valid
+            try {
+                const parsed = JSON.parse(cleanedResponse);
+                console.log('JSON parsed successfully without cleaning');
+                return {
+                    notAllowed: Array.isArray(parsed.notAllowed) ? parsed.notAllowed : [],
+                    portionDetails: parsed.portionDetails || {}
+                };
+            }
+            catch (initialError) {
+                console.log('Initial JSON parsing failed, attempting to fix...');
+            }
+            // If initial parsing failed, try to fix common JSON issues
             cleanedResponse = this.fixCommonJsonIssues(cleanedResponse);
             console.log('Cleaned program JSON:', cleanedResponse.substring(0, 500) + '...');
             const parsed = JSON.parse(cleanedResponse);
@@ -974,7 +954,7 @@ Ensure the JSON is properly formatted with double quotes around all property nam
             console.log(`Creating fallback response for program: ${programName}`);
             // Return a basic fallback response
             return {
-                notAllowed: ['fallback'],
+                notAllowed: ['snack'], // Use valid option instead of 'fallback'
                 portionDetails: {
                     'fallback': {
                         palmPercentage: 'unknown',
