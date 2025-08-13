@@ -174,7 +174,10 @@ class CollectionsService {
             'Gut health',
             'Hormonal health',
             '8+8+8 rule',
-            'No sugar Days challenge'
+            'No sugar Days challenge',
+            '1 salad a day',
+            'juicing',
+            '75 hard'
         ];
         let createdCount = 0;
         for (const programType of programTypes) {

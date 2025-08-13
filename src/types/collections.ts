@@ -35,7 +35,7 @@ export interface PortionDetail {
 export interface Program {
   id?: string;
   name: string;
-  type: 'Balanced' | 'Intermittent fasting' | 'Gut health' | 'Hormonal health' | '8+8+8 rule' | 'No sugar Days challenge';
+  type: 'Balanced' | 'Intermittent fasting' | 'Gut health' | 'Hormonal health' | '8+8+8 rule' | 'No sugar Days challenge' | '1 salad a day' | 'juicing' | '75 hard';
   description: string;
   duration: string;
   goals: string[];
