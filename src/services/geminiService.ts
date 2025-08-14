@@ -259,6 +259,14 @@ export class GeminiService {
    * Enhances ingredient with complete details using Gemini AI
    */
   async enhanceIngredientDetails(ingredient: Partial<Ingredient>): Promise<EnhancedIngredientData> {
+    // First check if the ingredient needs renaming
+    if (ingredient.title && this.shouldRenameIngredient(ingredient.title)) {
+      console.log(`Ingredient "${ingredient.title}" needs renaming`);
+      const newTitle = await this.renameIngredient(ingredient);
+      console.log(`Renamed "${ingredient.title}" to "${newTitle}"`);
+      ingredient.title = newTitle;
+    }
+
     const prompt = this.createIngredientEnhancementPrompt(ingredient);
     const maxRetries = 3;
     
@@ -334,6 +342,14 @@ export class GeminiService {
    * Creates an ingredient variation using Gemini AI
    */
   async createIngredientVariation(originalIngredient: Partial<Ingredient>, existingTitles: string[]): Promise<EnhancedIngredientData> {
+    // First check if the ingredient needs renaming
+    if (originalIngredient.title && this.shouldRenameIngredient(originalIngredient.title)) {
+      console.log(`Ingredient "${originalIngredient.title}" needs renaming before creating variation`);
+      const newTitle = await this.renameIngredient(originalIngredient);
+      console.log(`Renamed "${originalIngredient.title}" to "${newTitle}" for variation creation`);
+      originalIngredient.title = newTitle;
+    }
+
     const prompt = this.createIngredientVariationPrompt(originalIngredient, existingTitles);
     const maxRetries = 3;
     
@@ -829,7 +845,9 @@ Return a valid JSON object with the following structure (ensure all property nam
     "water": "string",
     "rainbow": "string"
   },
-  "techniques": ["string"],
+  "techniques": [
+    "string"
+  ],
   "storageOptions": {
     "countertop": "string",
     "fridge": "string",
@@ -839,6 +857,25 @@ Return a valid JSON object with the following structure (ensure all property nam
   "alt": ["string"],
   "image": "string"
 }
+
+IMPORTANT RULES:
+1. Return ONLY the JSON object. Do not include any code examples, explanations, or other text.
+2. The "title" should be a simple ingredient name (e.g., "kale", "braised kale", "roasted broccoli") - NOT a meal description like "Massaged Kale with Lemon-Ginger Zing"
+3. The "features" object must ONLY contain: fiber, g_i, rainbow, season, water
+4. The "techniques" array must contain objects with from this exact list:
+   - "raw"
+   - "frying"
+   - "grilling"
+   - "boiling"
+   - "smoothie"
+   - "roasting"
+   - "mashing"
+   - "baking"
+   - "sautéing"
+   - "soup"
+5. The "storageOptions" object must ONLY contain: countertop, fridge, freezer
+6. "rainbow" should be the ingredient color (e.g., "green" for broccoli, "red" for tomatoes)
+7. The response should be valid JSON that can be parsed directly.
 
 Ensure the JSON is properly formatted with double quotes around all property names and string values.`;
   }
@@ -865,7 +902,9 @@ Return a valid JSON object with the following structure (ensure all property nam
     "water": "string",
     "rainbow": "string"
   },
-  "techniques": ["string"],
+  "techniques": [
+    "string"
+  ],
   "storageOptions": {
     "countertop": "string",
     "fridge": "string",
@@ -875,6 +914,210 @@ Return a valid JSON object with the following structure (ensure all property nam
   "alt": ["string"],
   "image": "string"
 }
+
+IMPORTANT RULES:
+1. Return ONLY the JSON object. Do not include any code examples, explanations, or other text.
+2. The "title" should be a simple ingredient name (e.g., "kale", "braised kale", "roasted broccoli") - NOT a meal description like "Massaged Kale with Lemon-Ginger Zing"
+3. The "features" object must ONLY contain: fiber, g_i, rainbow, season, water
+4. The "techniques" array must contain objects with from this exact list:
+   - "raw"
+   - "frying"
+   - "grilling"
+   - "boiling"
+   - "smoothie"
+   - "roasting"
+   - "mashing"
+   - "baking"
+   - "sautéing"
+   - "soup"
+5. The "storageOptions" object must ONLY contain: countertop, fridge, freezer
+6. "rainbow" should be the ingredient color (e.g., "green" for broccoli, "red" for tomatoes)
+7. The response should be valid JSON that can be parsed directly.
+
+Ensure the JSON is properly formatted with double quotes around all property names and string values.`;
+  }
+
+  private shouldRenameIngredient(title: string): boolean {
+    const lowerTitle = title.toLowerCase();
+    return lowerTitle.includes('ingredient') || 
+           lowerTitle.includes('food') || 
+           lowerTitle.includes('item') ||
+           lowerTitle.includes('product');
+  }
+
+  private validateAndCorrectTechniques(techniques: any): string[] {
+    const allowedTechniques = [
+      'raw', 'frying', 'grilling', 'boiling', 'smoothie', 
+      'roasting', 'mashing', 'baking', 'sautéing', 'soup'
+    ];
+
+    if (!Array.isArray(techniques)) {
+      console.log('Techniques is not an array, using fallback');
+      return ['raw'];
+    }
+
+    const validTechniques = techniques.filter(tech => {
+      if (typeof tech === 'string') {
+        return allowedTechniques.includes(tech);
+      } else if (typeof tech === 'object' && tech.name) {
+        return allowedTechniques.includes(tech.name);
+      }
+      return false;
+    });
+
+    if (validTechniques.length === 0) {
+      console.log('No valid techniques found, using fallback');
+      return ['raw'];
+    }
+
+    // Convert to simple strings if they were objects
+    return validTechniques.map(tech => typeof tech === 'string' ? tech : tech.name);
+  }
+
+  private validateAndCorrectFeatures(features: any): {
+    fiber: string;
+    g_i: string;
+    season: string;
+    water: string;
+    rainbow: string;
+  } {
+    const requiredFeatures = ['fiber', 'g_i', 'season', 'water', 'rainbow'];
+    const fallbackFeatures = {
+      fiber: 'low',
+      g_i: 'low',
+      season: 'year-round',
+      water: 'low',
+      rainbow: 'unknown'
+    };
+
+    if (!features || typeof features !== 'object') {
+      console.log('Features is not an object, using fallback');
+      return fallbackFeatures;
+    }
+
+    const correctedFeatures = { ...fallbackFeatures };
+    
+    for (const feature of requiredFeatures) {
+      if (features[feature] && typeof features[feature] === 'string') {
+        correctedFeatures[feature as keyof typeof correctedFeatures] = features[feature];
+      }
+    }
+
+    return correctedFeatures;
+  }
+
+  private validateAndCorrectStorageOptions(storageOptions: any): {
+    countertop: string;
+    fridge: string;
+    freezer: string;
+  } {
+    const requiredStorage = ['countertop', 'fridge', 'freezer'];
+    const fallbackStorage = {
+      countertop: 'not recommended',
+      fridge: 'recommended',
+      freezer: 'not recommended'
+    };
+
+    if (!storageOptions || typeof storageOptions !== 'object') {
+      console.log('StorageOptions is not an object, using fallback');
+      return fallbackStorage;
+    }
+
+    const correctedStorage = { ...fallbackStorage };
+    
+    for (const storage of requiredStorage) {
+      if (storageOptions[storage] && typeof storageOptions[storage] === 'string') {
+        correctedStorage[storage as keyof typeof correctedStorage] = storageOptions[storage];
+      }
+    }
+
+    return correctedStorage;
+  }
+
+  async renameIngredient(ingredient: Partial<Ingredient>): Promise<string> {
+    const maxRetries = 3;
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Renaming ingredient: ${ingredient.title} (attempt ${attempt})`);
+        const prompt = this.createIngredientRenamingPrompt(ingredient);
+        const response = await fetch(`${this.baseUrl}?key=${this.apiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: prompt
+              }]
+            }]
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (!generatedText) {
+          throw new Error('No response generated by Gemini');
+        }
+        
+        // Parse the response to get the new title
+        const cleanedResponse = this.fixCommonJsonIssues(generatedText.replace(/```json\s*|\s*```/g, ''));
+        const parsed = JSON.parse(cleanedResponse);
+        
+        if (parsed.title && typeof parsed.title === 'string') {
+          return parsed.title;
+        } else {
+          throw new Error('Invalid response format: missing or invalid title');
+        }
+      } catch (error) {
+        console.error(`Error calling Gemini API for ingredient renaming (attempt ${attempt}):`, error);
+        lastError = error as Error;
+        
+        if (attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
+          console.log(`Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    console.error('All retry attempts failed for ingredient renaming, using fallback');
+    // Fallback: try to extract a meaningful name from the original title
+    const originalTitle = ingredient.title || 'Unknown Ingredient';
+    const cleanedTitle = originalTitle
+      .replace(/ingredient/gi, '')
+      .replace(/food/gi, '')
+      .replace(/item/gi, '')
+      .replace(/product/gi, '')
+      .trim();
+    
+    return cleanedTitle || 'Unknown Ingredient';
+  }
+
+  private createIngredientRenamingPrompt(ingredient: Partial<Ingredient>): string {
+    return `Rename this ingredient: "${ingredient.title}". 
+
+The current name contains generic words like "ingredient", "food", "item", or "product". Please provide a proper, specific ingredient name.
+
+Return a valid JSON object with ONLY the new title:
+
+{
+  "title": "string"
+}
+
+IMPORTANT RULES:
+1. Return ONLY the JSON object. Do not include any code examples, explanations, or other text.
+2. The "title" should be a simple, specific ingredient name (e.g., "kale", "broccoli", "chicken breast", "quinoa")
+3. Remove any generic words like "ingredient", "food", "item", "product"
+4. Keep it simple and descriptive of the actual ingredient
+5. The response should be valid JSON that can be parsed directly.
 
 Ensure the JSON is properly formatted with double quotes around all property names and string values.`;
   }
@@ -889,19 +1132,49 @@ Return a valid JSON object with the following structure (ensure all property nam
   "type": "string", 
   "calories": number,
   "macros": {
-    "protein": number,
-    "carbs": number,
-    "fat": number,
-    "fiber": number
+    "protein": "string",
+    "carbs": "string",
+    "fat": "string"
   },
   "categories": ["string"],
-  "features": ["string"],
-  "techniques": ["string"],
-  "storageOptions": ["string"],
+  "features": {
+    "fiber": "string",
+    "g_i": "string",
+    "season": "string",
+    "water": "string",
+    "rainbow": "string"
+  },
+  "techniques": [
+    "string"
+  ],
+  "storageOptions": {
+    "countertop": "string",
+    "fridge": "string",
+    "freezer": "string"
+  },
   "isAntiInflammatory": boolean,
   "alt": ["string"],
   "image": "string"
 }
+
+IMPORTANT RULES:
+1. Return ONLY the JSON object. Do not include any code examples, explanations, or other text.
+2. The "title" should be a simple ingredient name (e.g., "kale", "braised kale", "roasted broccoli") - NOT a meal description like "Massaged Kale with Lemon-Ginger Zing"
+3. The "features" object must ONLY contain: fiber, g_i, rainbow, season, water
+4. The "techniques" array must contain objects with from this exact list:
+   - "raw"
+   - "frying"
+   - "grilling"
+   - "boiling"
+   - "smoothie"
+   - "roasting"
+   - "mashing"
+   - "baking"
+   - "sautéing"
+   - "soup"
+5. The "storageOptions" object must ONLY contain: countertop, fridge, freezer
+6. "rainbow" should be the ingredient color (e.g., "green" for broccoli, "red" for tomatoes)
+7. The response should be valid JSON that can be parsed directly.
 
 Ensure the JSON is properly formatted with double quotes around all property names and string values.`;
   }
@@ -1184,17 +1457,23 @@ Ensure the JSON is properly formatted with double quotes around all property nam
       console.log('Cleaned JSON:', cleanedResponse.substring(0, 500) + '...');
       
       const parsed = JSON.parse(cleanedResponse);
+      
+      // Validate and correct the data structure
+      const validatedFeatures = this.validateAndCorrectFeatures(parsed.features);
+      const validatedTechniques = this.validateAndCorrectTechniques(parsed.techniques);
+      const validatedStorageOptions = this.validateAndCorrectStorageOptions(parsed.storageOptions);
+      
       return {
         title: parsed.title,
         type: parsed.type,
         calories: parsed.calories,
         macros: parsed.macros,
-        categories: Array.isArray(parsed.categories) ? parsed.categories : undefined,
-        features: parsed.features,
-        techniques: Array.isArray(parsed.techniques) ? parsed.techniques : undefined,
-        storageOptions: parsed.storageOptions,
+        categories: Array.isArray(parsed.categories) ? parsed.categories : [],
+        features: validatedFeatures,
+        techniques: validatedTechniques,
+        storageOptions: validatedStorageOptions,
         isAntiInflammatory: parsed.isAntiInflammatory,
-        alt: Array.isArray(parsed.alt) ? parsed.alt : undefined,
+        alt: Array.isArray(parsed.alt) ? parsed.alt : [],
         image: parsed.image
       };
     } catch (error) {
