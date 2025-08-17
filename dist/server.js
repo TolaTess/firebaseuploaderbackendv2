@@ -144,11 +144,11 @@ app.post('/api/update-ingredient-type', async (req, res) => {
 app.post('/api/update-multiple-ingredient-types', async (req, res) => {
     try {
         console.log('Manual multiple ingredient type updates triggered');
-        const { ingredientIds } = req.body;
-        if (!ingredientIds || !Array.isArray(ingredientIds)) {
-            return res.status(400).json({ success: false, error: 'ingredientIds array is required' });
+        const { ingredientIds = [], scope = 'last24hours' } = req.body;
+        if (ingredientIds.length > 0 && !Array.isArray(ingredientIds)) {
+            return res.status(400).json({ success: false, error: 'ingredientIds must be an array' });
         }
-        const results = await ingredientService.updateMultipleIngredientTypes(ingredientIds);
+        const results = await ingredientService.updateMultipleIngredientTypes(ingredientIds, scope);
         res.json({ success: true, results });
     }
     catch (error) {

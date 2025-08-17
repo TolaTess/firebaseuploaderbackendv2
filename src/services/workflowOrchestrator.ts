@@ -261,10 +261,10 @@ export class WorkflowOrchestrator {
         return { mealTitleResults, ingredientTitleResults };
       
       case 'type-check-and-fix':
-        return await this.executeTypeCheckAndFix();
+        return await this.executeTypeCheckAndFix(scope);
       
       case 'title-and-duplication-fix':
-        return await this.executeTitleAndDuplicationFix();
+        return await this.executeTitleAndDuplicationFix(scope);
       
       case 'enhancement-execution':
         const mealEnhancements = await this.mealService.updateMealsWithGeminiEnhancement();
@@ -324,7 +324,7 @@ export class WorkflowOrchestrator {
    * Executes type check and fix for ingredients
    * Reads from workflow state and immediately updates ingredient types
    */
-  private async executeTypeCheckAndFix(): Promise<any> {
+  private async executeTypeCheckAndFix(scope: 'all' | 'last24hours' | 'last7days' | 'last30days' | 'custom' = 'last24hours'): Promise<any> {
     console.log('🔧 Executing type check and fix for ingredients...');
     
     const workflowState = this.dataAnalysisService.getWorkflowState();
@@ -335,9 +335,9 @@ export class WorkflowOrchestrator {
       return { success: true, message: 'No ingredients need type updates', updated: 0 };
     }
     
-    console.log(`🔄 Updating types for ${ingredientsNeedingTypeUpdate.length} ingredients...`);
+    console.log(`🔄 Updating types for ${ingredientsNeedingTypeUpdate.length} ingredients (scope: ${scope})...`);
     
-    const results = await this.ingredientService.updateMultipleIngredientTypes(ingredientsNeedingTypeUpdate);
+    const results = await this.ingredientService.updateMultipleIngredientTypes(ingredientsNeedingTypeUpdate, scope);
     
     console.log(`✅ Type update completed: ${results.success} successful, ${results.failed} failed`);
     
@@ -352,7 +352,7 @@ export class WorkflowOrchestrator {
    * Executes title and duplication fixes
    * Reads from saved JSON analysis results and fixes titles and duplicates
    */
-  private async executeTitleAndDuplicationFix(): Promise<any> {
+  private async executeTitleAndDuplicationFix(scope: 'all' | 'last24hours' | 'last7days' | 'last30days' | 'custom' = 'all'): Promise<any> {
     console.log('🔧 Executing title and duplication fixes...');
     
     const lastAnalysis = this.dataAnalysisService.getLastAnalysis();
@@ -378,7 +378,7 @@ export class WorkflowOrchestrator {
     // Fix missing titles
     if (lastAnalysis.meals.withoutTitles > 0) {
       console.log(`📝 Adding titles to ${lastAnalysis.meals.withoutTitles} meals...`);
-      results.titleFixes.meals = await this.mealService.addTitlesToMeals([], 'all');
+      results.titleFixes.meals = await this.mealService.addTitlesToMeals([], scope);
     }
     
     if (lastAnalysis.ingredients.withoutTitles > 0) {

@@ -203,7 +203,7 @@ class WorkflowOrchestrator {
                 const ingredientTitleResults = await this.ingredientService.addTitlesToIngredients([], scope);
                 return { mealTitleResults, ingredientTitleResults };
             case 'type-check-and-fix':
-                return await this.executeTypeCheckAndFix();
+                return await this.executeTypeCheckAndFix(scope);
             case 'title-and-duplication-fix':
                 return await this.executeTitleAndDuplicationFix();
             case 'enhancement-execution':
@@ -252,7 +252,7 @@ class WorkflowOrchestrator {
      * Executes type check and fix for ingredients
      * Reads from workflow state and immediately updates ingredient types
      */
-    async executeTypeCheckAndFix() {
+    async executeTypeCheckAndFix(scope = 'last24hours') {
         console.log('🔧 Executing type check and fix for ingredients...');
         const workflowState = this.dataAnalysisService.getWorkflowState();
         const ingredientsNeedingTypeUpdate = workflowState.pendingTransformations.ingredients;
@@ -260,8 +260,8 @@ class WorkflowOrchestrator {
             console.log('✅ No ingredients need type updates');
             return { success: true, message: 'No ingredients need type updates', updated: 0 };
         }
-        console.log(`🔄 Updating types for ${ingredientsNeedingTypeUpdate.length} ingredients...`);
-        const results = await this.ingredientService.updateMultipleIngredientTypes(ingredientsNeedingTypeUpdate);
+        console.log(`🔄 Updating types for ${ingredientsNeedingTypeUpdate.length} ingredients (scope: ${scope})...`);
+        const results = await this.ingredientService.updateMultipleIngredientTypes(ingredientsNeedingTypeUpdate, scope);
         console.log(`✅ Type update completed: ${results.success} successful, ${results.failed} failed`);
         return {
             success: true,

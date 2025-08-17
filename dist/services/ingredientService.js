@@ -321,16 +321,28 @@ class IngredientService {
     }
     /**
      * Updates types for multiple ingredients based on their titles and macros
-     * @param ingredientIds Array of ingredient IDs to update
+     * @param ingredientIds Array of ingredient IDs to update (if empty, processes ingredients needing type updates based on scope)
+     * @param scope Analysis scope for finding ingredients needing type updates (defaults to last24hours)
      * @returns Promise<{ success: number; failed: number; results: Array<{ id: string; oldType: string; newType: string; success: boolean }> }>
      */
-    async updateMultipleIngredientTypes(ingredientIds) {
+    async updateMultipleIngredientTypes(ingredientIds = [], scope = 'last24hours') {
         try {
-            console.log(`Updating types for ${ingredientIds.length} ingredients...`);
+            let ingredientsToProcess = [];
+            if (ingredientIds.length > 0) {
+                // Process specific ingredient IDs
+                ingredientsToProcess = ingredientIds;
+                console.log(`Updating types for ${ingredientIds.length} specific ingredients...`);
+            }
+            else {
+                // Get ingredients needing type updates based on scope
+                const { ingredientsNeedingTypeUpdate } = await this.getIngredientsNeedingTypeUpdates(scope);
+                ingredientsToProcess = ingredientsNeedingTypeUpdate.map(ingredient => ingredient.id);
+                console.log(`Updating types for ${ingredientsToProcess.length} ingredients needing type updates (scope: ${scope})...`);
+            }
             const results = [];
             let successCount = 0;
             let failedCount = 0;
-            for (const ingredientId of ingredientIds) {
+            for (const ingredientId of ingredientsToProcess) {
                 try {
                     // Add delay to prevent API rate limiting
                     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -394,6 +406,80 @@ class IngredientService {
         }
     }
     /**
+     * Gets ingredients that need type updates based on scope
+     * @param scope Analysis scope (all, last24hours, last7days, last30days, custom)
+     * @returns Promise<{ingredientsNeedingTypeUpdate: FirestoreIngredient[], total: number, withValidTypes: number, needingTypeUpdate: number}>
+     */
+    async getIngredientsNeedingTypeUpdates(scope = 'last24hours') {
+        try {
+            console.log(`Getting ingredients needing type updates (scope: ${scope})...`);
+            // Create scope query based on createdAt and updatedAt
+            const scopeQuery = this.createScopeQuery(scope);
+            const ingredientsQuery = scopeQuery
+                ? (0, firestore_1.query)(this.collectionRef, scopeQuery)
+                : this.collectionRef;
+            const allIngredients = await (0, firestore_1.getDocs)(ingredientsQuery);
+            const ingredients = [];
+            const ingredientsNeedingTypeUpdate = [];
+            allIngredients.forEach((doc) => {
+                const data = doc.data();
+                const ingredient = { ...data, id: doc.id };
+                // Check if ingredient needs type update (missing type or invalid type)
+                const needsTypeUpdate = !ingredient.type ||
+                    !['protein', 'grain', 'vegetable', 'fruit', 'sweetener', 'condiment', 'pastry', 'dairy', 'oil', 'herb', 'spice', 'liquid'].includes(ingredient.type);
+                if (needsTypeUpdate) {
+                    ingredientsNeedingTypeUpdate.push(ingredient);
+                    console.log(`Ingredient "${ingredient.title}" (ID: ${doc.id}) needs type update. Current type: ${ingredient.type || 'missing'}`);
+                }
+                else {
+                    ingredients.push(ingredient);
+                }
+            });
+            const withValidTypes = ingredients.length;
+            const needingTypeUpdate = ingredientsNeedingTypeUpdate.length;
+            const total = withValidTypes + needingTypeUpdate;
+            console.log(`Found ${needingTypeUpdate} ingredients needing type updates out of ${total} total ingredients (scope: ${scope})`);
+            return {
+                ingredientsNeedingTypeUpdate,
+                total,
+                withValidTypes,
+                needingTypeUpdate
+            };
+        }
+        catch (error) {
+            console.error('Error getting ingredients needing type updates:', error);
+            throw error;
+        }
+    }
+    /**
+     * Creates a scope query for filtering ingredients by time
+     * @param scope Analysis scope
+     * @returns Firestore query constraint or null for 'all' scope
+     */
+    createScopeQuery(scope) {
+        const now = new Date();
+        let startDate;
+        switch (scope) {
+            case 'last24hours':
+                startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                break;
+            case 'last7days':
+                startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                break;
+            case 'last30days':
+                startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                break;
+            case 'custom':
+                // For custom, we'll use last 24 hours as default
+                startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                break;
+            default: // 'all'
+                return null;
+        }
+        // Query by both createdAt and updatedAt to catch both new and recently updated ingredients
+        return (0, firestore_1.or)((0, firestore_1.where)('createdAt', '>=', firestore_1.Timestamp.fromDate(startDate)), (0, firestore_1.where)('updatedAt', '>=', firestore_1.Timestamp.fromDate(startDate)));
+    }
+    /**
      * Checks for ingredients without titles and returns them
      * @param scope Analysis scope (all, last24hours, last7days, last30days, custom)
      * @returns Promise<{ingredientsWithoutTitles: FirestoreIngredient[], total: number, withTitles: number, withoutTitles: number}>
@@ -401,7 +487,12 @@ class IngredientService {
     async checkIngredientsWithoutTitles(scope = 'all') {
         try {
             console.log(`Checking for ingredients without titles (scope: ${scope})...`);
-            const allIngredients = await (0, firestore_1.getDocs)(this.collectionRef);
+            // Create scope query based on createdAt and updatedAt
+            const scopeQuery = this.createScopeQuery(scope);
+            const ingredientsQuery = scopeQuery
+                ? (0, firestore_1.query)(this.collectionRef, scopeQuery)
+                : this.collectionRef;
+            const allIngredients = await (0, firestore_1.getDocs)(ingredientsQuery);
             const ingredients = [];
             const ingredientsWithoutTitles = [];
             allIngredients.forEach((doc) => {
@@ -418,7 +509,7 @@ class IngredientService {
             const withTitles = ingredients.length;
             const withoutTitles = ingredientsWithoutTitles.length;
             const total = withTitles + withoutTitles;
-            console.log(`Found ${withoutTitles} ingredients without titles out of ${total} total ingredients`);
+            console.log(`Found ${withoutTitles} ingredients without titles out of ${total} total ingredients (scope: ${scope})`);
             return {
                 ingredientsWithoutTitles,
                 total,
