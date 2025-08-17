@@ -62,7 +62,7 @@ interface EnhancedDietCategory {
 
 interface EnhancedIngredientData {
   title?: string;
-  type?: 'protein' | 'vegetable' | 'fruit' | 'grain' | 'sweetener' | 'condiment' | 'pastry';
+  type?: 'protein' | 'grain' | 'vegetable' | 'fruit' | 'sweetener' | 'condiment' | 'pastry' | 'dairy' | 'oil' | 'herb' | 'spice' | 'liquid';
   calories?: number;
   macros?: {
     protein: string;
@@ -1678,9 +1678,9 @@ Ensure the JSON is properly formatted with double quotes around all property nam
 
   /**
    * Updates the ingredient type based on title and macros analysis
-   * Only allows 4 types: protein, grain, vegetable, fruit
+   * Allows 12 types: protein, grain, vegetable, fruit, sweetener, condiment, pastry, dairy, oil, herb, spice, liquid
    */
-  async updateIngredientType(ingredient: Partial<Ingredient>): Promise<'protein' | 'grain' | 'vegetable' | 'fruit'> {
+  async updateIngredientType(ingredient: Partial<Ingredient>): Promise<'protein' | 'grain' | 'vegetable' | 'fruit' | 'sweetener' | 'condiment' | 'pastry' | 'dairy' | 'oil' | 'herb' | 'spice' | 'liquid'> {
     const prompt = this.createIngredientTypeClassificationPrompt(ingredient);
     const maxRetries = 3;
     
@@ -1737,7 +1737,7 @@ Ensure the JSON is properly formatted with double quotes around all property nam
     const carbs = ingredient.macros?.carbs || '0';
     const fat = ingredient.macros?.fat || '0';
 
-    return `Analyze this ingredient and classify it into one of the 4 allowed types based on its title and nutritional macros.
+    return `Analyze this ingredient and classify it into one of the 12 allowed types based on its title and nutritional macros.
 
 Ingredient: ${title}
 Calories: ${calories}
@@ -1746,23 +1746,29 @@ Carbs: ${carbs}g
 Fat: ${fat}g
 
 Allowed types:
-1. "protein" - High protein foods like meat, fish, eggs, legumes, dairy
+1. "protein" - High protein foods like meat, fish, eggs, legumes
 2. "grain" - Carbohydrate-rich foods like rice, wheat, oats, quinoa, bread, pasta
 3. "vegetable" - Plant-based foods that are not sweet, like broccoli, spinach, carrots, peppers
 4. "fruit" - Sweet plant-based foods like apples, bananas, berries, oranges
+5. "sweetener" - Sugar, honey, maple syrup, artificial sweeteners
+6. "condiment" - Sauces, dressings, spreads like ketchup, mustard, mayo, salsa
+7. "pastry" - Baked goods like cakes, cookies, pies, croissants
+8. "dairy" - Milk, cheese, yogurt, butter, cream
+9. "oil" - Cooking oils, olive oil, coconut oil, vegetable oil
+10. "herb" - Fresh or dried herbs like basil, thyme, rosemary, cilantro
+11. "spice" - Spices and seasonings like salt, pepper, cinnamon, paprika
+12. "liquid" - Beverages, broths, juices, water-based ingredients
 
 Classification rules:
-- If protein content is highest (>50% of calories from protein), classify as "protein"
-- If carbs content is highest (>60% of calories from carbs) and it's a grain/starch, classify as "grain"
-- If it's a sweet plant food, classify as "fruit"
-- If it's a non-sweet plant food, classify as "vegetable"
-- Consider the title name as the primary indicator, use macros as secondary validation
+- Consider the title name as the primary indicator
+- Use macros as secondary validation
+- Be specific and accurate in classification
 
-Return ONLY one of these exact strings: "protein", "grain", "vegetable", or "fruit"
+Return ONLY one of these exact strings: "protein", "grain", "vegetable", "fruit", "sweetener", "condiment", "pastry", "dairy", "oil", "herb", "spice", or "liquid"
 Do not include any explanations, quotes, or additional text.`;
   }
 
-  private parseIngredientTypeResponse(response: string): 'protein' | 'grain' | 'vegetable' | 'fruit' {
+  private parseIngredientTypeResponse(response: string): 'protein' | 'grain' | 'vegetable' | 'fruit' | 'sweetener' | 'condiment' | 'pastry' | 'dairy' | 'oil' | 'herb' | 'spice' | 'liquid' {
     try {
       // Clean the response
       let cleanedResponse = response.trim().toLowerCase();
@@ -1771,9 +1777,10 @@ Do not include any explanations, quotes, or additional text.`;
       cleanedResponse = cleanedResponse.replace(/['"]/g, '');
       
       // Check if it's one of the valid types
-      if (cleanedResponse === 'protein' || cleanedResponse === 'grain' || 
-          cleanedResponse === 'vegetable' || cleanedResponse === 'fruit') {
-        return cleanedResponse as 'protein' | 'grain' | 'vegetable' | 'fruit';
+      const validTypes = ['protein', 'grain', 'vegetable', 'fruit', 'sweetener', 'condiment', 'pastry', 'dairy', 'oil', 'herb', 'spice', 'liquid'];
+      
+      if (validTypes.includes(cleanedResponse)) {
+        return cleanedResponse as 'protein' | 'grain' | 'vegetable' | 'fruit' | 'sweetener' | 'condiment' | 'pastry' | 'dairy' | 'oil' | 'herb' | 'spice' | 'liquid';
       }
       
       // If not a valid type, throw error to trigger fallback
@@ -1784,7 +1791,7 @@ Do not include any explanations, quotes, or additional text.`;
     }
   }
 
-  private fallbackIngredientTypeClassification(ingredient: Partial<Ingredient>): 'protein' | 'grain' | 'vegetable' | 'fruit' {
+  private fallbackIngredientTypeClassification(ingredient: Partial<Ingredient>): 'protein' | 'grain' | 'vegetable' | 'fruit' | 'sweetener' | 'condiment' | 'pastry' | 'dairy' | 'oil' | 'herb' | 'spice' | 'liquid' {
     const title = (ingredient.title || '').toLowerCase();
     const protein = parseFloat(ingredient.macros?.protein || '0');
     const carbs = parseFloat(ingredient.macros?.carbs || '0');
@@ -1794,6 +1801,63 @@ Do not include any explanations, quotes, or additional text.`;
     const totalCalories = protein * 4 + carbs * 4 + fat * 9;
     const proteinPercentage = totalCalories > 0 ? (protein * 4 / totalCalories) * 100 : 0;
     const carbsPercentage = totalCalories > 0 ? (carbs * 4 / totalCalories) * 100 : 0;
+    
+    // Sweetener classification
+    if (title.includes('sugar') || title.includes('honey') || title.includes('syrup') ||
+        title.includes('sweetener') || title.includes('stevia') || title.includes('agave') ||
+        title.includes('maple') || title.includes('molasses')) {
+      return 'sweetener';
+    }
+    
+    // Condiment classification
+    if (title.includes('sauce') || title.includes('dressing') || title.includes('ketchup') ||
+        title.includes('mustard') || title.includes('mayo') || title.includes('salsa') ||
+        title.includes('hot sauce') || title.includes('soy sauce') || title.includes('vinegar')) {
+      return 'condiment';
+    }
+    
+    // Pastry classification
+    if (title.includes('cake') || title.includes('cookie') || title.includes('pie') ||
+        title.includes('pastry') || title.includes('croissant') || title.includes('muffin') ||
+        title.includes('brownie') || title.includes('donut') || title.includes('bread')) {
+      return 'pastry';
+    }
+    
+    // Dairy classification
+    if (title.includes('milk') || title.includes('cheese') || title.includes('yogurt') ||
+        title.includes('butter') || title.includes('cream') || title.includes('sour cream') ||
+        title.includes('cottage cheese') || title.includes('cream cheese')) {
+      return 'dairy';
+    }
+    
+    // Oil classification
+    if (title.includes('oil') || title.includes('olive') || title.includes('coconut') ||
+        title.includes('vegetable oil') || title.includes('canola') || title.includes('sesame')) {
+      return 'oil';
+    }
+    
+    // Herb classification
+    if (title.includes('basil') || title.includes('thyme') || title.includes('rosemary') ||
+        title.includes('cilantro') || title.includes('parsley') || title.includes('oregano') ||
+        title.includes('sage') || title.includes('mint') || title.includes('dill')) {
+      return 'herb';
+    }
+    
+    // Spice classification
+    if (title.includes('salt') || title.includes('pepper') || title.includes('cinnamon') ||
+        title.includes('paprika') || title.includes('cumin') || title.includes('turmeric') ||
+        title.includes('ginger') || title.includes('garlic') || title.includes('onion') ||
+        title.includes('spice') || title.includes('seasoning')) {
+      return 'spice';
+    }
+    
+    // Liquid classification
+    if (title.includes('water') || title.includes('juice') || title.includes('broth') ||
+        title.includes('stock') || title.includes('tea') || title.includes('coffee') ||
+        title.includes('soda') || title.includes('milk') || title.includes('wine') ||
+        title.includes('beer') || title.includes('liquor')) {
+      return 'liquid';
+    }
     
     // Protein classification
     if (proteinPercentage > 50 || 
@@ -1806,9 +1870,9 @@ Do not include any explanations, quotes, or additional text.`;
     
     // Grain classification
     if (carbsPercentage > 60 || 
-        title.includes('rice') || title.includes('pasta') || title.includes('bread') ||
-        title.includes('quinoa') || title.includes('oats') || title.includes('wheat') ||
-        title.includes('corn') || title.includes('potato') || title.includes('sweet potato')) {
+        title.includes('rice') || title.includes('pasta') || title.includes('quinoa') ||
+        title.includes('oats') || title.includes('wheat') || title.includes('corn') ||
+        title.includes('potato') || title.includes('sweet potato')) {
       return 'grain';
     }
     

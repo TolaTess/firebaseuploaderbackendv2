@@ -7,7 +7,7 @@ import { GeminiService } from './geminiService';
 interface FirestoreIngredient {
   id?: string;
   title?: string;
-  type?: 'protein' | 'vegetable' | 'fruit' | 'grain' | 'sweetener' | 'condiment' | 'pastry';
+  type?: 'protein' | 'grain' | 'vegetable' | 'fruit' | 'sweetener' | 'condiment' | 'pastry' | 'dairy' | 'oil' | 'herb' | 'spice' | 'liquid';
   mediaPaths: string[];
   calories?: number;
   macros?: {

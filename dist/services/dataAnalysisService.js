@@ -305,7 +305,7 @@ class DataAnalysisService {
      */
     needsTypeUpdate(ingredient) {
         return !ingredient.type ||
-            !['protein', 'grain', 'vegetable', 'fruit'].includes(ingredient.type);
+            !['protein', 'grain', 'vegetable', 'fruit', 'sweetener', 'condiment', 'pastry', 'dairy', 'oil', 'herb', 'spice', 'liquid'].includes(ingredient.type);
     }
     /**
      * Checks if an ingredient needs enhancement
