@@ -264,7 +264,7 @@ export class DataAnalysisService {
         }
 
         // Check if meal needs enhancement
-        if (this.needsEnhancement(meal)) {
+        if (this.mealNeedsEnhancement(meal)) {
           needsEnhancement.push(doc.id);
         }
       });
@@ -338,7 +338,7 @@ export class DataAnalysisService {
         }
 
         // Check if ingredient needs enhancement
-        if (this.needsEnhancement(ingredient)) {
+        if (this.ingredientNeedsEnhancement(ingredient)) {
           needsEnhancement.push(doc.id);
         }
       });
@@ -439,7 +439,7 @@ export class DataAnalysisService {
   /**
    * Checks if a meal needs enhancement
    */
-  private needsEnhancement(meal: FirestoreMeal): boolean {
+  private mealNeedsEnhancement(meal: FirestoreMeal): boolean {
     return !meal.description ||
            !meal.type ||
            !meal.cookingTime ||
@@ -464,7 +464,7 @@ export class DataAnalysisService {
   /**
    * Checks if an ingredient needs enhancement
    */
-  private needsEnhancement(ingredient: FirestoreIngredient): boolean {
+  private ingredientNeedsEnhancement(ingredient: FirestoreIngredient): boolean {
     return !ingredient.calories ||
            !ingredient.macros ||
            !ingredient.categories ||
