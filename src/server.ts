@@ -93,6 +93,41 @@ app.post('/api/generate-ingredients', async (req, res) => {
   }
 });
 
+// Ingredient type update endpoints
+app.post('/api/update-ingredient-type', async (req, res) => {
+  try {
+    console.log('Manual ingredient type update triggered');
+    const { ingredientId } = req.body;
+    
+    if (!ingredientId) {
+      return res.status(400).json({ success: false, error: 'ingredientId is required' });
+    }
+    
+    const newType = await ingredientService.updateIngredientType(ingredientId);
+    res.json({ success: true, newType, ingredientId });
+  } catch (error) {
+    console.error('Error updating ingredient type:', error);
+    res.status(500).json({ success: false, error: (error as Error).message });
+  }
+});
+
+app.post('/api/update-multiple-ingredient-types', async (req, res) => {
+  try {
+    console.log('Manual multiple ingredient type updates triggered');
+    const { ingredientIds } = req.body;
+    
+    if (!ingredientIds || !Array.isArray(ingredientIds)) {
+      return res.status(400).json({ success: false, error: 'ingredientIds array is required' });
+    }
+    
+    const results = await ingredientService.updateMultipleIngredientTypes(ingredientIds);
+    res.json({ success: true, results });
+  } catch (error) {
+    console.error('Error updating multiple ingredient types:', error);
+    res.status(500).json({ success: false, error: (error as Error).message });
+  }
+});
+
 // Collections enhancement endpoints
 app.post('/api/enhance-cooking-methods', async (req, res) => {
   try {

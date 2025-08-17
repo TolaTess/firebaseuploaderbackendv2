@@ -1,7 +1,8 @@
-import { collection, getDocs, updateDoc, doc, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, Timestamp, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Nutrition } from '../types/meal';
 import { GeminiService } from '../services/geminiService';
+import { DataAnalysisService } from './dataAnalysisService';
 
 // Define the shape of data as it exists in Firestore
 interface FirestoreMeal {

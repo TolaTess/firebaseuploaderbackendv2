@@ -380,6 +380,135 @@ export class IngredientService {
   }
 
   /**
+   * Updates the type of an ingredient based on its title and macros
+   * Only allows 4 types: protein, grain, vegetable, fruit
+   * @param ingredientId The ID of the ingredient to update
+   * @returns Promise<string> The new type assigned to the ingredient
+   */
+  async updateIngredientType(ingredientId: string): Promise<string> {
+    try {
+      console.log(`Updating ingredient type for ID: ${ingredientId}`);
+      
+      // Get the ingredient from Firestore
+      const ingredientDoc = doc(this.collectionRef, ingredientId);
+      const ingredientSnapshot = await getDocs(this.collectionRef);
+      const ingredient = ingredientSnapshot.docs.find(doc => doc.id === ingredientId);
+      
+      if (!ingredient) {
+        throw new Error(`Ingredient with ID ${ingredientId} not found`);
+      }
+      
+      const ingredientData = ingredient.data() as FirestoreIngredient;
+      
+      // Use Gemini to classify the ingredient type
+      const newType = await this.geminiService.updateIngredientType({
+        title: ingredientData.title,
+        calories: ingredientData.calories,
+        macros: ingredientData.macros
+      });
+      
+      // Update the ingredient in Firestore
+      await updateDoc(ingredientDoc, {
+        type: newType,
+        updatedAt: Timestamp.now()
+      });
+      
+      console.log(`Updated ingredient "${ingredientData.title}" type from "${ingredientData.type}" to "${newType}"`);
+      return newType;
+    } catch (error) {
+      console.error('Error updating ingredient type:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Updates types for multiple ingredients based on their titles and macros
+   * @param ingredientIds Array of ingredient IDs to update
+   * @returns Promise<{ success: number; failed: number; results: Array<{ id: string; oldType: string; newType: string; success: boolean }> }>
+   */
+  async updateMultipleIngredientTypes(ingredientIds: string[]): Promise<{
+    success: number;
+    failed: number;
+    results: Array<{ id: string; oldType: string; newType: string; success: boolean; error?: string }>;
+  }> {
+    try {
+      console.log(`Updating types for ${ingredientIds.length} ingredients...`);
+      
+      const results: Array<{ id: string; oldType: string; newType: string; success: boolean; error?: string }> = [];
+      let successCount = 0;
+      let failedCount = 0;
+      
+      for (const ingredientId of ingredientIds) {
+        try {
+          // Add delay to prevent API rate limiting
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          const ingredientDoc = doc(this.collectionRef, ingredientId);
+          const ingredientSnapshot = await getDocs(this.collectionRef);
+          const ingredient = ingredientSnapshot.docs.find(doc => doc.id === ingredientId);
+          
+          if (!ingredient) {
+            results.push({
+              id: ingredientId,
+              oldType: 'unknown',
+              newType: 'unknown',
+              success: false,
+              error: 'Ingredient not found'
+            });
+            failedCount++;
+            continue;
+          }
+          
+          const ingredientData = ingredient.data() as FirestoreIngredient;
+          const oldType = ingredientData.type || 'unknown';
+          
+          // Use Gemini to classify the ingredient type
+          const newType = await this.geminiService.updateIngredientType({
+            title: ingredientData.title,
+            calories: ingredientData.calories,
+            macros: ingredientData.macros
+          });
+          
+          // Update the ingredient in Firestore
+          await updateDoc(ingredientDoc, {
+            type: newType,
+            updatedAt: Timestamp.now()
+          });
+          
+          results.push({
+            id: ingredientId,
+            oldType,
+            newType,
+            success: true
+          });
+          successCount++;
+          
+        } catch (error) {
+          console.error(`Error updating ingredient type for ID ${ingredientId}:`, error);
+          results.push({
+            id: ingredientId,
+            oldType: 'unknown',
+            newType: 'unknown',
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+          failedCount++;
+        }
+      }
+      
+      console.log(`Ingredient type updates complete. Success: ${successCount}, Failed: ${failedCount}`);
+      return {
+        success: successCount,
+        failed: failedCount,
+        results
+      };
+    } catch (error) {
+      console.error('Error updating multiple ingredient types:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Generates new ingredients of specified types using Gemini AI
    * @returns Promise<number> Number of ingredients generated
    */
