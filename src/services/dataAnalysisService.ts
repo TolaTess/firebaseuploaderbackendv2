@@ -458,7 +458,7 @@ export class DataAnalysisService {
    */
   private needsTypeUpdate(ingredient: FirestoreIngredient): boolean {
     return !ingredient.type || 
-           !['protein', 'grain', 'vegetable', 'fruit'].includes(ingredient.type);
+           !['protein', 'grain', 'vegetable', 'fruit', 'sweetener', 'condiment', 'pastry', 'dairy', 'oil', 'herb', 'spice', 'liquid'].includes(ingredient.type);
   }
 
   /**
