@@ -425,53 +425,49 @@ const scheduleJobs = () => {
     }
   });
 
-  // Step 3: Transformation Check and Execution (3 AM)
+  // Step 3: Type Check and Fix (3 AM)
   cron.schedule('0 3 * * *', async () => {
     try {
       console.log('🔄 Scheduled workflow step 3 started at:', new Date().toISOString());
-      console.log('🔄 Step 3: Transformation Check and Execution');
+      console.log('🔧 Step 3: Type Check and Fix');
       
       const { WorkflowOrchestrator } = await import('./services/workflowOrchestrator');
       const orchestrator = new WorkflowOrchestrator();
       
-      // Execute transformation check
-      const transformationResult = await orchestrator.executeSpecificStep('transformation-check', 'all');
-      console.log('✅ Transformation check completed:', transformationResult);
+      // Execute type check and fix
+      const typeCheckResult = await orchestrator.executeSpecificStep('type-check-and-fix', 'all');
+      console.log('✅ Type check and fix completed:', typeCheckResult);
       
-      // Execute duplicate transformations (with API rate limiting)
-      console.log('🔄 Executing duplicate transformations with rate limiting...');
-      
-      // Transform meal duplicates with delays
-      try {
-        const mealCount = await mealService.transformDuplicatesIntoVariations();
-        console.log('✅ Meal duplicate transformation completed:', mealCount, 'meals transformed');
-      } catch (error) {
-        console.error('❌ Error transforming meal duplicates:', error);
-      }
-      
-      // Wait 30 minutes before ingredient transformations
-      console.log('⏳ Waiting 30 minutes before ingredient transformations...');
-      await new Promise(resolve => setTimeout(resolve, 30 * 60 * 1000));
-      
-      // Transform ingredient duplicates with delays
-      try {
-        const ingredientCount = await ingredientService.transformDuplicatesIntoVariations();
-        console.log('✅ Ingredient duplicate transformation completed:', ingredientCount, 'ingredients transformed');
-      } catch (error) {
-        console.error('❌ Error transforming ingredient duplicates:', error);
-      }
-      
-      console.log('🔄 Step 3 completed successfully');
+      console.log('🔧 Step 3 completed successfully');
     } catch (error) {
       console.error('❌ Scheduled workflow step 3 failed:', error);
     }
   });
 
-  // Step 4: Enhancement Execution (4 AM) - with 1 hour spacing and rate limiting
+  // Step 3.5: Title and Duplication Fix (3:30 AM)
+  cron.schedule('30 3 * * *', async () => {
+    try {
+      console.log('🔄 Scheduled workflow step 3.5 started at:', new Date().toISOString());
+      console.log('📝 Step 3.5: Title and Duplication Fix');
+      
+      const { WorkflowOrchestrator } = await import('./services/workflowOrchestrator');
+      const orchestrator = new WorkflowOrchestrator();
+      
+      // Execute title and duplication fix
+      const titleDuplicationResult = await orchestrator.executeSpecificStep('title-and-duplication-fix', 'all');
+      console.log('✅ Title and duplication fix completed:', titleDuplicationResult);
+      
+      console.log('📝 Step 3.5 completed successfully');
+    } catch (error) {
+      console.error('❌ Scheduled workflow step 3.5 failed:', error);
+    }
+  });
+
+  // Step 4: Enhancement Execution (4 AM) - Overall enhancement checks
   cron.schedule('0 4 * * *', async () => {
     try {
       console.log('🔄 Scheduled workflow step 4 started at:', new Date().toISOString());
-      console.log('✨ Step 4: Enhancement Execution (with rate limiting)');
+      console.log('✨ Step 4: Enhancement Execution (Overall enhancement checks)');
       
       const { WorkflowOrchestrator } = await import('./services/workflowOrchestrator');
       const orchestrator = new WorkflowOrchestrator();
@@ -516,7 +512,7 @@ const scheduleJobs = () => {
     }
   });
 
-  // Optional: Complete workflow execution (5 AM) - for comprehensive runs
+  // Step 5: Complete workflow execution (5 AM) - for comprehensive runs
   cron.schedule('0 5 * * *', async () => {
     try {
       console.log('🚀 Scheduled complete workflow execution started at:', new Date().toISOString());

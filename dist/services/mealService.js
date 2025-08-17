@@ -4,10 +4,12 @@ exports.MealService = void 0;
 const firestore_1 = require("firebase/firestore");
 const firebase_1 = require("../config/firebase");
 const geminiService_1 = require("../services/geminiService");
+const dataAnalysisService_1 = require("./dataAnalysisService");
 class MealService {
     constructor() {
         this.collectionRef = (0, firestore_1.collection)(firebase_1.db, 'meals');
         this.geminiService = new geminiService_1.GeminiService();
+        this.dataAnalysisService = new dataAnalysisService_1.DataAnalysisService();
     }
     /**
      * Detects and transforms duplicate meals into unique variations
@@ -259,6 +261,193 @@ class MealService {
         }
         catch (error) {
             console.error('Error updating meals with Gemini enhancement:', error);
+            throw error;
+        }
+    }
+    /**
+     * Checks for meals without titles and returns them
+     * @param scope Analysis scope (all, last24hours, last7days, last30days, custom)
+     * @returns Promise<{mealsWithoutTitles: FirestoreMeal[], total: number, withTitles: number, withoutTitles: number}>
+     */
+    async checkMealsWithoutTitles(scope = 'all') {
+        try {
+            console.log(`Checking for meals without titles (scope: ${scope})...`);
+            const analysisScope = { type: scope };
+            const mealsAnalysis = await this.dataAnalysisService.analyzeMeals(analysisScope);
+            console.log(`Found ${mealsAnalysis.withoutTitles} meals without titles out of ${mealsAnalysis.total} total meals`);
+            return {
+                mealsWithoutTitles: mealsAnalysis.mealsWithoutTitles,
+                total: mealsAnalysis.total,
+                withTitles: mealsAnalysis.withTitles,
+                withoutTitles: mealsAnalysis.withoutTitles
+            };
+        }
+        catch (error) {
+            console.error('Error checking meals without titles:', error);
+            throw error;
+        }
+    }
+    /**
+     * Adds titles to meals that are missing them using Gemini AI
+     * @param mealIds Array of meal IDs to add titles to (if empty, processes all meals without titles)
+     * @param scope Analysis scope for finding meals without titles
+     * @returns Promise<{success: number; failed: number; results: Array<{id: string; oldTitle: string; newTitle: string; success: boolean; error?: string}>}>
+     */
+    async addTitlesToMeals(mealIds = [], scope = 'all') {
+        try {
+            console.log('Starting to add titles to meals...');
+            let mealsToProcess;
+            if (mealIds.length > 0) {
+                // Process specific meal IDs
+                const allMeals = await (0, firestore_1.getDocs)(this.collectionRef);
+                mealsToProcess = allMeals.docs
+                    .map(doc => ({ ...doc.data(), id: doc.id }))
+                    .filter(meal => mealIds.includes(meal.id) && (!meal.title || meal.title.trim().length === 0));
+            }
+            else {
+                // Process all meals without titles based on scope
+                const { mealsWithoutTitles } = await this.checkMealsWithoutTitles(scope);
+                mealsToProcess = mealsWithoutTitles;
+            }
+            console.log(`Processing ${mealsToProcess.length} meals for title addition`);
+            const results = [];
+            let successCount = 0;
+            let failedCount = 0;
+            for (const meal of mealsToProcess) {
+                try {
+                    console.log(`Adding title to meal: ${meal.id}`);
+                    // Generate title using Gemini based on meal content
+                    const newTitle = await this.generateMealTitle(meal);
+                    if (newTitle && newTitle.trim().length > 0) {
+                        // Update the meal in Firestore
+                        await (0, firestore_1.updateDoc)((0, firestore_1.doc)(this.collectionRef, meal.id), {
+                            title: newTitle,
+                            updatedAt: firestore_1.Timestamp.now()
+                        });
+                        results.push({
+                            id: meal.id,
+                            oldTitle: meal.title || '',
+                            newTitle,
+                            success: true
+                        });
+                        successCount++;
+                        console.log(`Successfully added title "${newTitle}" to meal ${meal.id}`);
+                    }
+                    else {
+                        throw new Error('Generated title is empty');
+                    }
+                    // Small delay to avoid rate limiting
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+                catch (error) {
+                    console.error(`Error adding title to meal ${meal.id}:`, error);
+                    results.push({
+                        id: meal.id,
+                        oldTitle: meal.title || '',
+                        newTitle: '',
+                        success: false,
+                        error: error instanceof Error ? error.message : 'Unknown error'
+                    });
+                    failedCount++;
+                }
+            }
+            console.log(`Title addition complete. Success: ${successCount}, Failed: ${failedCount}`);
+            return {
+                success: successCount,
+                failed: failedCount,
+                results
+            };
+        }
+        catch (error) {
+            console.error('Error adding titles to meals:', error);
+            throw error;
+        }
+    }
+    /**
+     * Generates a title for a meal using Gemini AI based on its content
+     * @param meal The meal to generate a title for
+     * @returns Promise<string> The generated title
+     */
+    async generateMealTitle(meal) {
+        try {
+            // Create a prompt for title generation based on available meal data
+            const prompt = this.createMealTitleGenerationPrompt(meal);
+            const response = await fetch(`${this.geminiService['baseUrl']}?key=${this.geminiService['apiKey']}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    contents: [{
+                            parts: [{
+                                    text: prompt
+                                }]
+                        }]
+                })
+            });
+            if (!response.ok) {
+                throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+            }
+            const data = await response.json();
+            const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!generatedText) {
+                throw new Error('No response generated by Gemini');
+            }
+            // Clean and validate the generated title
+            const title = generatedText.trim().replace(/['"]/g, '');
+            if (title.length === 0 || title.length > 100) {
+                throw new Error('Generated title is invalid');
+            }
+            return title;
+        }
+        catch (error) {
+            console.error('Error generating meal title:', error);
+            throw error;
+        }
+    }
+    /**
+     * Creates a prompt for meal title generation
+     * @param meal The meal to generate a title for
+     * @returns string The prompt for Gemini
+     */
+    createMealTitleGenerationPrompt(meal) {
+        const description = meal.description || '';
+        const ingredients = meal.ingredients ? Object.values(meal.ingredients).join(', ') : '';
+        const cookingMethod = meal.cookingMethod || '';
+        const type = meal.type || '';
+        return `Generate a concise, appetizing title for this meal based on the available information.
+
+Meal Information:
+- Description: ${description}
+- Ingredients: ${ingredients}
+- Cooking Method: ${cookingMethod}
+- Type: ${type}
+
+Requirements:
+1. Title should be 2-8 words maximum
+2. Should be appetizing and descriptive
+3. Should reflect the main ingredients or cooking method
+4. Should not include measurements or quantities
+5. Should be in title case (e.g., "Grilled Salmon with Vegetables")
+
+Return ONLY the title. Do not include quotes, explanations, or additional text.`;
+    }
+    /**
+     * Performs comprehensive data analysis and workflow management
+     * @param scope Analysis scope for the workflow
+     * @returns Promise<DataAnalysisResult> The analysis results
+     */
+    async performDataAnalysisWorkflow(scope = 'all') {
+        try {
+            console.log(`Starting comprehensive data analysis workflow (scope: ${scope})...`);
+            const analysisScope = { type: scope };
+            const result = await this.dataAnalysisService.performComprehensiveAnalysis(analysisScope);
+            console.log('Data analysis workflow completed successfully');
+            console.log('Summary:', result.summary);
+            return result;
+        }
+        catch (error) {
+            console.error('Error performing data analysis workflow:', error);
             throw error;
         }
     }

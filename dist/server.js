@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -89,6 +122,141 @@ app.post('/api/generate-ingredients', async (req, res) => {
     }
     catch (error) {
         console.error('Error generating ingredients:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+// Ingredient type update endpoints
+app.post('/api/update-ingredient-type', async (req, res) => {
+    try {
+        console.log('Manual ingredient type update triggered');
+        const { ingredientId } = req.body;
+        if (!ingredientId) {
+            return res.status(400).json({ success: false, error: 'ingredientId is required' });
+        }
+        const newType = await ingredientService.updateIngredientType(ingredientId);
+        res.json({ success: true, newType, ingredientId });
+    }
+    catch (error) {
+        console.error('Error updating ingredient type:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+app.post('/api/update-multiple-ingredient-types', async (req, res) => {
+    try {
+        console.log('Manual multiple ingredient type updates triggered');
+        const { ingredientIds } = req.body;
+        if (!ingredientIds || !Array.isArray(ingredientIds)) {
+            return res.status(400).json({ success: false, error: 'ingredientIds array is required' });
+        }
+        const results = await ingredientService.updateMultipleIngredientTypes(ingredientIds);
+        res.json({ success: true, results });
+    }
+    catch (error) {
+        console.error('Error updating multiple ingredient types:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+// Data analysis and workflow endpoints
+app.post('/api/analyze-data', async (req, res) => {
+    try {
+        console.log('Manual data analysis triggered');
+        const { scope = 'all' } = req.body;
+        const result = await mealService.performDataAnalysisWorkflow(scope);
+        res.json({ success: true, result });
+    }
+    catch (error) {
+        console.error('Error analyzing data:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+app.post('/api/check-meals-without-titles', async (req, res) => {
+    try {
+        console.log('Manual check for meals without titles triggered');
+        const { scope = 'all' } = req.body;
+        const result = await mealService.checkMealsWithoutTitles(scope);
+        res.json({ success: true, result });
+    }
+    catch (error) {
+        console.error('Error checking meals without titles:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+app.post('/api/add-titles-to-meals', async (req, res) => {
+    try {
+        console.log('Manual title addition to meals triggered');
+        const { mealIds = [], scope = 'all' } = req.body;
+        const result = await mealService.addTitlesToMeals(mealIds, scope);
+        res.json({ success: true, result });
+    }
+    catch (error) {
+        console.error('Error adding titles to meals:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+app.get('/api/workflow-status', async (req, res) => {
+    try {
+        console.log('Workflow status requested');
+        const dataAnalysisService = new (await Promise.resolve().then(() => __importStar(require('./services/dataAnalysisService')))).DataAnalysisService();
+        const workflowState = dataAnalysisService.getWorkflowState();
+        const lastAnalysis = dataAnalysisService.getLastAnalysis();
+        res.json({
+            success: true,
+            workflowState,
+            lastAnalysis
+        });
+    }
+    catch (error) {
+        console.error('Error getting workflow status:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+// Workflow orchestrator endpoints
+app.post('/api/workflow/execute', async (req, res) => {
+    try {
+        console.log('Manual workflow execution triggered');
+        const { scope = 'all' } = req.body;
+        const { WorkflowOrchestrator } = await Promise.resolve().then(() => __importStar(require('./services/workflowOrchestrator')));
+        const orchestrator = new WorkflowOrchestrator();
+        const result = await orchestrator.executeCompleteWorkflow(scope);
+        res.json({ success: true, result });
+    }
+    catch (error) {
+        console.error('Error executing workflow:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+app.post('/api/workflow/step', async (req, res) => {
+    try {
+        console.log('Manual workflow step execution triggered');
+        const { step, scope = 'all' } = req.body;
+        if (!step) {
+            return res.status(400).json({ success: false, error: 'step is required' });
+        }
+        const { WorkflowOrchestrator } = await Promise.resolve().then(() => __importStar(require('./services/workflowOrchestrator')));
+        const orchestrator = new WorkflowOrchestrator();
+        const result = await orchestrator.executeSpecificStep(step, scope);
+        res.json({ success: true, result });
+    }
+    catch (error) {
+        console.error('Error executing workflow step:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+app.get('/api/workflow/status', async (req, res) => {
+    try {
+        console.log('Workflow execution status requested');
+        const { WorkflowOrchestrator } = await Promise.resolve().then(() => __importStar(require('./services/workflowOrchestrator')));
+        const orchestrator = new WorkflowOrchestrator();
+        const status = orchestrator.getWorkflowStatus();
+        const recommendations = orchestrator.getWorkflowRecommendations();
+        res.json({
+            success: true,
+            status,
+            recommendations
+        });
+    }
+    catch (error) {
+        console.error('Error getting workflow execution status:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -226,127 +394,141 @@ app.post('/api/enhance-all', async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
-// Schedule cron jobs
+// Schedule cron jobs with new workflow system
 const scheduleJobs = () => {
-    // Run duplicate scan every day at 1 AM
+    // Step 1: Data Analysis and Duplicate Detection (1 AM)
     node_cron_1.default.schedule('0 1 * * *', async () => {
         try {
-            console.log('Scheduled duplicate scan started at:', new Date().toISOString());
-            const summary = await mealService.getDuplicatesSummary();
-            console.log('Duplicate scan completed:', summary);
+            console.log('🔄 Scheduled workflow step 1 started at:', new Date().toISOString());
+            console.log('📊 Step 1: Data Analysis and Duplicate Detection');
+            const { WorkflowOrchestrator } = await Promise.resolve().then(() => __importStar(require('./services/workflowOrchestrator')));
+            const orchestrator = new WorkflowOrchestrator();
+            // Execute data analysis and duplicate detection steps
+            const analysisResult = await orchestrator.executeSpecificStep('data-analysis', 'all');
+            console.log('✅ Data analysis completed:', analysisResult.summary);
+            const duplicateResult = await orchestrator.executeSpecificStep('duplicate-detection', 'all');
+            console.log('✅ Duplicate detection completed:', duplicateResult);
+            console.log('🔄 Step 1 completed successfully');
         }
         catch (error) {
-            console.error('Scheduled duplicate scan failed:', error);
+            console.error('❌ Scheduled workflow step 1 failed:', error);
         }
     });
-    // Run duplicate transformations every day at 2 AM
+    // Step 2: Title Validation and Addition (2 AM)
     node_cron_1.default.schedule('0 2 * * *', async () => {
         try {
-            console.log('Scheduled duplicate transformations started at:', new Date().toISOString());
-            // Transform meal duplicates
-            try {
-                const mealCount = await mealService.transformDuplicatesIntoVariations();
-                console.log('Meal duplicate transformation completed:', mealCount, 'meals transformed');
-            }
-            catch (error) {
-                console.error('Error transforming meal duplicates:', error);
-            }
-            // Transform ingredient duplicates
-            try {
-                const ingredientCount = await ingredientService.transformDuplicatesIntoVariations();
-                console.log('Ingredient duplicate transformation completed:', ingredientCount, 'ingredients transformed');
-            }
-            catch (error) {
-                console.error('Error transforming ingredient duplicates:', error);
-            }
+            console.log('🔄 Scheduled workflow step 2 started at:', new Date().toISOString());
+            console.log('📝 Step 2: Title Validation and Addition');
+            const { WorkflowOrchestrator } = await Promise.resolve().then(() => __importStar(require('./services/workflowOrchestrator')));
+            const orchestrator = new WorkflowOrchestrator();
+            // Execute title validation and addition steps
+            const titleValidationResult = await orchestrator.executeSpecificStep('title-validation', 'all');
+            console.log('✅ Title validation completed:', titleValidationResult);
+            const titleAdditionResult = await orchestrator.executeSpecificStep('title-addition', 'all');
+            console.log('✅ Title addition completed:', titleAdditionResult);
+            console.log('🔄 Step 2 completed successfully');
         }
         catch (error) {
-            console.error('Scheduled duplicate transformations failed:', error);
+            console.error('❌ Scheduled workflow step 2 failed:', error);
         }
     });
-    // Run program updates every day at 3 AM
-    // COMMENTED OUT - Program scheduling disabled
-    /*
-    cron.schedule('0 3 * * *', async () => {
-      try {
-        console.log('Scheduled program updates started at:', new Date().toISOString());
-        
-        const results = {
-          programs: 0,
-          routines: 0
-        };
-  
-        // Enhance programs
+    // Step 3: Type Check and Fix (3 AM)
+    node_cron_1.default.schedule('0 3 * * *', async () => {
         try {
-          results.programs = await collectionsService.updateProgramsWithPortionDetails();
-          console.log(`Enhanced ${results.programs} programs`);
-        } catch (error) {
-          console.error('Error enhancing programs:', error);
+            console.log('🔄 Scheduled workflow step 3 started at:', new Date().toISOString());
+            console.log('🔧 Step 3: Type Check and Fix');
+            const { WorkflowOrchestrator } = await Promise.resolve().then(() => __importStar(require('./services/workflowOrchestrator')));
+            const orchestrator = new WorkflowOrchestrator();
+            // Execute type check and fix
+            const typeCheckResult = await orchestrator.executeSpecificStep('type-check-and-fix', 'all');
+            console.log('✅ Type check and fix completed:', typeCheckResult);
+            console.log('🔧 Step 3 completed successfully');
         }
-  
-        // Create routines for programs
-        try {
-          results.routines = await collectionsService.createProgramRoutines();
-          console.log(`Created routines for ${results.routines} programs`);
-        } catch (error) {
-          console.error('Error creating routines:', error);
+        catch (error) {
+            console.error('❌ Scheduled workflow step 3 failed:', error);
         }
-  
-        console.log('Program updates completed:', results);
-      } catch (error) {
-        console.error('Scheduled program updates failed:', error);
-      }
     });
-    */
-    // Run comprehensive enhancement (excluding programs) every day at 4 AM 
+    // Step 3.5: Title and Duplication Fix (3:30 AM)
+    node_cron_1.default.schedule('30 3 * * *', async () => {
+        try {
+            console.log('🔄 Scheduled workflow step 3.5 started at:', new Date().toISOString());
+            console.log('📝 Step 3.5: Title and Duplication Fix');
+            const { WorkflowOrchestrator } = await Promise.resolve().then(() => __importStar(require('./services/workflowOrchestrator')));
+            const orchestrator = new WorkflowOrchestrator();
+            // Execute title and duplication fix
+            const titleDuplicationResult = await orchestrator.executeSpecificStep('title-and-duplication-fix', 'all');
+            console.log('✅ Title and duplication fix completed:', titleDuplicationResult);
+            console.log('📝 Step 3.5 completed successfully');
+        }
+        catch (error) {
+            console.error('❌ Scheduled workflow step 3.5 failed:', error);
+        }
+    });
+    // Step 4: Enhancement Execution (4 AM) - Overall enhancement checks
     node_cron_1.default.schedule('0 4 * * *', async () => {
         try {
-            console.log('Scheduled comprehensive enhancement started at:', new Date().toISOString());
+            console.log('🔄 Scheduled workflow step 4 started at:', new Date().toISOString());
+            console.log('✨ Step 4: Enhancement Execution (Overall enhancement checks)');
+            const { WorkflowOrchestrator } = await Promise.resolve().then(() => __importStar(require('./services/workflowOrchestrator')));
+            const orchestrator = new WorkflowOrchestrator();
+            // Execute enhancement step with built-in rate limiting
+            const enhancementResult = await orchestrator.executeSpecificStep('enhancement-execution', 'all');
+            console.log('✅ Enhancement execution completed:', enhancementResult);
+            // Additional enhancements with proper spacing
+            console.log('🔄 Running additional enhancements with rate limiting...');
             const results = {
-                meals: 0,
-                ingredients: 0,
                 cookingMethods: 0,
                 dietCategories: 0
             };
-            // Enhance meals
-            try {
-                results.meals = await mealService.updateMealsWithGeminiEnhancement();
-                console.log(`Enhanced ${results.meals} meals`);
-            }
-            catch (error) {
-                console.error('Error enhancing meals:', error);
-            }
-            // Enhance ingredients
-            try {
-                results.ingredients = await ingredientService.updateIngredientsWithGeminiEnhancement();
-                console.log(`Enhanced ${results.ingredients} ingredients`);
-            }
-            catch (error) {
-                console.error('Error enhancing ingredients:', error);
-            }
             // Enhance cooking methods
             try {
+                console.log('🔄 Enhancing cooking methods...');
                 results.cookingMethods = await collectionsService.enhanceCookingMethods();
-                console.log(`Enhanced ${results.cookingMethods} cooking methods`);
+                console.log(`✅ Enhanced ${results.cookingMethods} cooking methods`);
             }
             catch (error) {
-                console.error('Error enhancing cooking methods:', error);
+                console.error('❌ Error enhancing cooking methods:', error);
             }
+            // Wait 30 minutes before diet categories
+            console.log('⏳ Waiting 30 minutes before diet category enhancements...');
+            await new Promise(resolve => setTimeout(resolve, 30 * 60 * 1000));
             // Enhance diet categories
             try {
+                console.log('🔄 Enhancing diet categories...');
                 results.dietCategories = await collectionsService.enhanceDietCategories();
-                console.log(`Enhanced ${results.dietCategories} diet categories`);
+                console.log(`✅ Enhanced ${results.dietCategories} diet categories`);
             }
             catch (error) {
-                console.error('Error enhancing diet categories:', error);
+                console.error('❌ Error enhancing diet categories:', error);
             }
-            console.log('Comprehensive enhancement completed:', results);
+            console.log('✨ Step 4 completed successfully:', results);
         }
         catch (error) {
-            console.error('Scheduled comprehensive enhancement failed:', error);
+            console.error('❌ Scheduled workflow step 4 failed:', error);
         }
     });
-    console.log('Cron jobs scheduled successfully');
+    // Step 5: Complete workflow execution (5 AM) - for comprehensive runs
+    node_cron_1.default.schedule('0 5 * * *', async () => {
+        try {
+            console.log('🚀 Scheduled complete workflow execution started at:', new Date().toISOString());
+            console.log('🎯 Complete Workflow: Full data quality check');
+            const { WorkflowOrchestrator } = await Promise.resolve().then(() => __importStar(require('./services/workflowOrchestrator')));
+            const orchestrator = new WorkflowOrchestrator();
+            // Execute complete workflow with scope 'all'
+            const completeResult = await orchestrator.executeCompleteWorkflow('all');
+            console.log('🎉 Complete workflow execution finished:', completeResult.summary);
+        }
+        catch (error) {
+            console.error('❌ Scheduled complete workflow execution failed:', error);
+        }
+    });
+    console.log('✅ Cron jobs scheduled successfully with new workflow system');
+    console.log('📅 Schedule:');
+    console.log('   1 AM - Data Analysis & Duplicate Detection');
+    console.log('   2 AM - Title Validation & Addition');
+    console.log('   3 AM - Transformation Check & Execution (with 30min spacing)');
+    console.log('   4 AM - Enhancement Execution (with 30min spacing)');
+    console.log('   5 AM - Complete Workflow Execution (optional)');
 };
 // Start the server
 app.listen(PORT, () => {
