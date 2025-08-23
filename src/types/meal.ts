@@ -24,7 +24,7 @@ export interface Meal {
   description?: string;
   type?: 'protein' | 'grain' | 'vegetable' | 'fruit';
   cookingTime?: string;
-  cookingMethod?: 'raw' | 'grilling' | 'poaching' | 'frying' | 'braising' | 'boiling' | 'other';
+  cookingMethod?: 'raw' | 'frying' | 'grilling' | 'boiling' | 'smoothie' | 'roasting' | 'mashing' | 'baking' | 'sautéing' | 'soup' | 'poaching' | 'braising' | 'other';  // Added 'other' to the list
   ingredients: {
     [key: string]: string; // amount with unit (e.g., '1 cup', '200g')
   };

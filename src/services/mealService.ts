@@ -11,7 +11,7 @@ interface FirestoreMeal {
   description?: string;
   type?: 'protein' | 'grain' | 'vegetable' | 'fruit';
   cookingTime?: string;
-  cookingMethod?: 'raw' | 'grilled' | 'fried' | 'baked' | 'boiled' | 'steamed' | 'other';
+  cookingMethod?: 'raw' | 'frying' | 'grilling' | 'boiling' | 'poaching' | 'braising' | 'other';   // Added 'other' to the list
   ingredients: {
     [key: string]: string; // amount with unit (e.g., '1 cup', '200g')
   };
@@ -87,7 +87,7 @@ export class MealService {
                 description: duplicate.description,
                 ingredients: duplicate.ingredients,
                 type: duplicate.type,
-                cookingMethod: duplicate.cookingMethod as 'raw' | 'grilling' | 'poaching' | 'frying' | 'braising' | 'boiling' | 'other',
+                cookingMethod: duplicate.cookingMethod as 'raw' | 'frying' | 'grilling' | 'boiling' | 'poaching' | 'braising' | 'other',
                 instructions: duplicate.instructions
               },
               existingTitles
@@ -99,7 +99,7 @@ export class MealService {
               description: variation.description,
               type: variation.type,
               cookingTime: variation.cookingTime,
-              cookingMethod: variation.cookingMethod as 'raw' | 'grilled' | 'fried' | 'baked' | 'boiled' | 'steamed' | 'other',
+              cookingMethod: variation.cookingMethod as 'raw' | 'frying' | 'grilling' | 'boiling' | 'poaching' | 'braising' | 'other',  // Added 'other' to the list
               ingredients: variation.ingredients || duplicate.ingredients,
               instructions: variation.instructions,
               categories: variation.categories,
@@ -299,7 +299,7 @@ export class MealService {
           }
           
           if (enhancedData.cookingMethod && !meal.cookingMethod) {
-            updates.cookingMethod = enhancedData.cookingMethod;
+            updates.cookingMethod = enhancedData.cookingMethod as 'raw' | 'frying' | 'grilling' | 'boiling' | 'poaching' | 'braising' | 'other';  // Added 'other' to the list
           }
           
           if (enhancedData.instructions && (!meal.instructions || meal.instructions.length === 0)) {
@@ -375,7 +375,7 @@ export class MealService {
       console.log(`Found ${mealsAnalysis.withoutTitles} meals without titles out of ${mealsAnalysis.total} total meals`);
       
       return {
-        mealsWithoutTitles: mealsAnalysis.mealsWithoutTitles,
+        mealsWithoutTitles: mealsAnalysis.mealsWithoutTitles as FirestoreMeal[],
         total: mealsAnalysis.total,
         withTitles: mealsAnalysis.withTitles,
         withoutTitles: mealsAnalysis.withoutTitles
@@ -677,9 +677,9 @@ Return ONLY the title. Do not include quotes, explanations, or additional text.`
 
           // Fix cookingMethod if it's not one of the allowed values
           if (mealData.cookingMethod && 
-              !['raw', 'grilled', 'fried', 'baked', 'boiled', 'steamed', 'other'].includes(mealData.cookingMethod)) {
-            console.log(`Fixing cookingMethod from "${mealData.cookingMethod}" to "other"`);
-            updates.cookingMethod = 'other';
+              !['raw', 'frying', 'grilling', 'boiling', 'smoothie', 'roasting', 'mashing', 'baking', 'sautéing', 'soup'].includes(mealData.cookingMethod)) {
+            console.log(`Fixing cookingMethod from "${mealData.cookingMethod}" to "raw"`);
+            updates.cookingMethod = 'raw';
             hasChanges = true;
           }
 
@@ -689,6 +689,12 @@ Return ONLY the title. Do not include quotes, explanations, or additional text.`
             let ingredientsChanged = false;
             
             for (const [key, value] of Object.entries(mealData.ingredients)) {
+              // Skip invalid ingredient names (numbers, empty strings, etc.)
+              if (this.isInvalidIngredientName(key)) {
+                console.log(`Skipping invalid ingredient name: "${key}"`);
+                continue;
+              }
+              
               // Check if the value already has units (contains common unit patterns)
               const hasUnits = /\b(cup|tbsp|tsp|g|kg|ml|l|oz|lb|piece|slice|clove|bunch|head|can|jar|pack|bag|dash|pinch)\b/i.test(value);
               
@@ -782,6 +788,47 @@ Return ONLY the title. Do not include quotes, explanations, or additional text.`
       console.error('Error fixing meal structure:', error);
       throw error;
     }
+  }
+
+  /**
+   * Checks if an ingredient name is invalid (should be skipped)
+   * @param ingredientName The name of the ingredient to check
+   * @returns boolean True if the ingredient name is invalid
+   */
+  private isInvalidIngredientName(ingredientName: string): boolean {
+    if (!ingredientName || typeof ingredientName !== 'string') {
+      return true;
+    }
+    
+    const name = ingredientName.trim();
+    
+    // Skip empty strings
+    if (name.length === 0) {
+      return true;
+    }
+    
+    // Skip numeric names (like "1", "2", "3")
+    if (/^\d+$/.test(name)) {
+      return true;
+    }
+    
+    // Skip names that are just punctuation or special characters
+    if (/^[^\w\s]+$/.test(name)) {
+      return true;
+    }
+    
+    // Skip names that are too short (less than 2 characters)
+    if (name.length < 2) {
+      return true;
+    }
+    
+    // Skip names that are common placeholders
+    const invalidNames = ['ingredient', 'item', 'food', 'stuff', 'thing', 'unknown', 'n/a', 'none'];
+    if (invalidNames.includes(name.toLowerCase())) {
+      return true;
+    }
+    
+    return false;
   }
 
   /**

@@ -10,7 +10,7 @@ interface FirestoreMeal {
   description?: string;
   type?: 'protein' | 'grain' | 'vegetable' | 'fruit';
   cookingTime?: string;
-  cookingMethod?: 'raw' | 'grilled' | 'fried' | 'baked' | 'boiled' | 'steamed' | 'other';
+  cookingMethod?: 'raw' | 'frying' | 'grilling' | 'boiling' | 'poaching' | 'braising' | 'other';  // Added 'other' to the list
   ingredients: {
     [key: string]: string; // amount with unit (e.g., '1 cup', '200g')
   };

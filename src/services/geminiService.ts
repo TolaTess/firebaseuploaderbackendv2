@@ -6,7 +6,7 @@ interface EnhancedMealData {
   description?: string;
   type?: 'protein' | 'grain' | 'vegetable' | 'fruit';
   cookingTime?: string;
-  cookingMethod?: 'raw' | 'grilled' | 'fried' | 'baked' | 'boiled' | 'steamed' | 'other';
+  cookingMethod?: 'raw' | 'frying' | 'grilling' | 'boiling' | 'poaching' | 'braising' | 'other';  // Added 'other' to the list
   ingredients?: {
     [key: string]: string; // amount with unit (e.g., '1 cup', '200g')
   };
@@ -31,7 +31,7 @@ interface MealVariation {
   description?: string;
   type?: 'protein' | 'grain' | 'vegetable' | 'fruit';
   cookingTime?: string;
-  cookingMethod?: 'raw' | 'grilled' | 'fried' | 'baked' | 'boiled' | 'steamed' | 'other';
+  cookingMethod?: 'raw' | 'frying' | 'grilling' | 'boiling' | 'poaching' | 'braising' | 'other';  // Added 'other' to the list
   ingredients?: {
     [key: string]: string; // amount with unit (e.g., '1 cup', '200g')
   };
@@ -783,7 +783,7 @@ Return a valid JSON object with the following structure (ensure all property nam
   "description": "string",
   "type": "string",
   "cookingTime": "string",
-  "cookingMethod": "raw|grilled|fried|baked|boiled|steamed|other",
+  "cookingMethod": "raw|frying|grilling|boiling|smoothie|roasting|mashing|baking|sautéing|soup",
   "ingredients": {
     "ingredient1": "amount with unit (e.g., '1 cup', '200g')",
     "ingredient2": "amount with unit"
@@ -809,7 +809,7 @@ Return a valid JSON object with the following structure (ensure all property nam
 
 IMPORTANT RULES:
 1. Return ONLY the JSON object. Do not include any code examples, explanations, or other text.
-2. The "cookingMethod" must be one of: raw, grilling, poaching, frying, braising, boiling, or other
+2. The "cookingMethod" must be one of: raw, frying, grilling, boiling, smoothie, roasting, mashing, baking, sautéing, soup
 3. The "ingredients" object should contain ingredient names as keys and amounts with units as values (e.g., "tomatoes": "2 cups", "olive oil": "2 tablespoons")
 4. The "suggestions" object must contain: improvements, alternatives, and additions arrays
 5. Ensure the JSON is properly formatted with double quotes around all property names and string values.`;
@@ -853,7 +853,7 @@ Return a valid JSON object with the following structure (ensure all property nam
   "description": "string",
   "type": "string",
   "cookingTime": "string",
-  "cookingMethod": "raw|grilled|fried|baked|boiled|steamed|other",
+  "cookingMethod": "raw|frying|grilling|boiling|smoothie|roasting|mashing|baking|sautéing|soup",
   "ingredients": {
     "ingredient1": "amount with unit (e.g., '1 cup', '200g')",
     "ingredient2": "amount with unit"
@@ -871,7 +871,7 @@ Return a valid JSON object with the following structure (ensure all property nam
 
 IMPORTANT RULES:
 1. Return ONLY the JSON object. Do not include any code examples, explanations, or other text.
-2. The "cookingMethod" must be one of: raw, grilled, fried, baked, boiled, steamed, or other
+2. The "cookingMethod" must be one of: raw, frying, grilling, boiling, smoothie, roasting, mashing, baking, sautéing, soup
 3. The "ingredients" object should contain ingredient names as keys and amounts with units as values (e.g., "tomatoes": "2 cups", "olive oil": "2 tablespoons")
 4. The "suggestions" object must contain: improvements, alternatives, and additions arrays
 5. Ensure the JSON is properly formatted with double quotes around all property names and string values.`;
