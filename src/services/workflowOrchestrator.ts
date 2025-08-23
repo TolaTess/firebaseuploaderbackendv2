@@ -97,7 +97,10 @@ export class WorkflowOrchestrator {
         { name: 'title-validation', status: 'pending' },
         { name: 'title-addition', status: 'pending' },
         { name: 'transformation-check', status: 'pending' },
-        { name: 'enhancement-execution', status: 'pending' }
+        { name: 'meal-structure-fix', status: 'pending' },
+        { name: 'enhancement-execution', status: 'pending' },
+        { name: 'enhanced-ingredient-enhancement', status: 'pending' },
+        { name: 'ingredient-structure-fix', status: 'pending' }
       ],
       summary: {
         totalSteps: 6,
@@ -266,10 +269,22 @@ export class WorkflowOrchestrator {
       case 'title-and-duplication-fix':
         return await this.executeTitleAndDuplicationFix(scope);
       
+      case 'meal-structure-fix':
+        const mealStructureFix = await this.mealService.fixMealStructure();
+        return { mealStructureFix };
+      
       case 'enhancement-execution':
         const mealEnhancements = await this.mealService.updateMealsWithGeminiEnhancement();
         const ingredientEnhancements = await this.ingredientService.updateIngredientsWithGeminiEnhancement();
         return { mealEnhancements, ingredientEnhancements };
+      
+      case 'enhanced-ingredient-enhancement':
+        const enhancedIngredientEnhancements = await this.ingredientService.updateIngredientsWithEnhancedGeminiEnhancement();
+        return { enhancedIngredientEnhancements };
+      
+      case 'ingredient-structure-fix':
+        const ingredientStructureFix = await this.ingredientService.fixIngredientStructure();
+        return { ingredientStructureFix };
       
       default:
         throw new Error(`Unknown step: ${stepName}`);
@@ -312,6 +327,9 @@ export class WorkflowOrchestrator {
     if (lastAnalysis.ingredients.needsEnhancement.length > 0) {
       recommendations.push(`Enhance ${lastAnalysis.ingredients.needsEnhancement.length} ingredients with missing details`);
     }
+
+    // Always recommend meal structure fix to ensure consistency
+    recommendations.push('Fix meal structure to match new format (ingredients with units, cookingMethod values, suggestions structure)');
 
     if (recommendations.length === 0) {
       recommendations.push('All data appears to be in good condition');

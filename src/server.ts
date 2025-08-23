@@ -299,6 +299,51 @@ app.post('/api/create-routines', async (req, res) => {
   }
 });
 
+app.post('/api/fix-meal-structure', async (req, res) => {
+  try {
+    console.log('Manual meal structure fix triggered');
+    const result = await mealService.fixMealStructure();
+    res.json({ 
+      success: true, 
+      message: `Fixed meal structure: ${result.success} successful, ${result.failed} failed`,
+      result 
+    });
+  } catch (error) {
+    console.error('Error fixing meal structure:', error);
+    res.status(500).json({ success: false, error: (error as Error).message });
+  }
+});
+
+app.post('/api/fix-ingredient-structure', async (req, res) => {
+  try {
+    console.log('Manual ingredient structure fix triggered');
+    const result = await ingredientService.fixIngredientStructure();
+    res.json({ 
+      success: true, 
+      message: `Fixed ingredient structure: ${result.success} successful, ${result.failed} failed`,
+      result 
+    });
+  } catch (error) {
+    console.error('Error fixing ingredient structure:', error);
+    res.status(500).json({ success: false, error: (error as Error).message });
+  }
+});
+
+app.post('/api/enhanced-ingredient-enhancement', async (req, res) => {
+  try {
+    console.log('Manual enhanced ingredient enhancement triggered');
+    const count = await ingredientService.updateIngredientsWithEnhancedGeminiEnhancement();
+    res.json({ 
+      success: true, 
+      message: `Enhanced ${count} ingredients with improved features`,
+      enhancedCount: count 
+    });
+  } catch (error) {
+    console.error('Error with enhanced ingredient enhancement:', error);
+    res.status(500).json({ success: false, error: (error as Error).message });
+  }
+});
+
 app.get('/api/programs-summary', async (req, res) => {
   try {
     console.log('Programs summary requested');
@@ -324,6 +369,22 @@ app.post('/api/enhance-all', async (req, res) => {
       routines: 0
     };
 
+    // Fix meal structure
+    try {
+      const mealStructureFix = await mealService.fixMealStructure();
+      console.log(`Fixed meal structure: ${mealStructureFix.success} successful, ${mealStructureFix.failed} failed`);
+    } catch (error) {
+      console.error('Error fixing meal structure:', error);
+    }
+
+    // Fix ingredient structure
+    try {
+      const ingredientStructureFix = await ingredientService.fixIngredientStructure();
+      console.log(`Fixed ingredient structure: ${ingredientStructureFix.success} successful, ${ingredientStructureFix.failed} failed`);
+    } catch (error) {
+      console.error('Error fixing ingredient structure:', error);
+    }
+
     // Enhance meals
     try {
       results.meals = await mealService.updateMealsWithGeminiEnhancement();
@@ -338,6 +399,14 @@ app.post('/api/enhance-all', async (req, res) => {
       console.log(`Enhanced ${results.ingredients} ingredients`);
     } catch (error) {
       console.error('Error enhancing ingredients:', error);
+    }
+
+    // Enhanced ingredient enhancement with improved features
+    try {
+      const enhancedIngredientEnhancements = await ingredientService.updateIngredientsWithEnhancedGeminiEnhancement();
+      console.log(`Enhanced ${enhancedIngredientEnhancements} ingredients with improved features`);
+    } catch (error) {
+      console.error('Error with enhanced ingredient enhancement:', error);
     }
 
     // Enhance cooking methods

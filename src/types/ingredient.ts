@@ -11,11 +11,11 @@ export interface Ingredient {
   };
   categories: string[]; // keto, carnivore, healthy etc
   features: {
-    fiber: string;
-    g_i: string; // glycemic index
-    season: string;
-    water: string;
-    rainbow: string;
+    fiber: string; // e.g., "10g"
+    g_i: string; // glycemic index e.g., "40", "low", "medium", "high"
+    season: 'spring' | 'summer' | 'autumn' | 'winter' | 'year-round' | 'fall/winter' | 'spring/summer';
+    water: string; // e.g., "10%"
+    rainbow: 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple' | 'white' | 'brown' | 'pink' | 'black';
   };
   techniques: string[]; // cooking methods - baking, grilling etc
   storageOptions: {

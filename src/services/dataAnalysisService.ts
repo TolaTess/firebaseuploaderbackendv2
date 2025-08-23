@@ -10,8 +10,10 @@ interface FirestoreMeal {
   description?: string;
   type?: 'protein' | 'grain' | 'vegetable' | 'fruit';
   cookingTime?: string;
-  cookingMethod?: string;
-  ingredients: Record<string, string>;
+  cookingMethod?: 'raw' | 'grilled' | 'fried' | 'baked' | 'boiled' | 'steamed' | 'other';
+  ingredients: {
+    [key: string]: string; // amount with unit (e.g., '1 cup', '200g')
+  };
   instructions?: string[];
   nutritionalInfo?: any;
   categories?: string[];

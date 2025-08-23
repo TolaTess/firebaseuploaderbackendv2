@@ -11,8 +11,10 @@ interface FirestoreMeal {
   description?: string;
   type?: 'protein' | 'grain' | 'vegetable' | 'fruit';
   cookingTime?: string;
-  cookingMethod?: string;
-  ingredients: Record<string, string>;
+  cookingMethod?: 'raw' | 'grilled' | 'fried' | 'baked' | 'boiled' | 'steamed' | 'other';
+  ingredients: {
+    [key: string]: string; // amount with unit (e.g., '1 cup', '200g')
+  };
   instructions?: string[];
   nutritionalInfo?: Nutrition;
   categories?: string[];
@@ -85,7 +87,7 @@ export class MealService {
                 description: duplicate.description,
                 ingredients: duplicate.ingredients,
                 type: duplicate.type,
-                cookingMethod: duplicate.cookingMethod,
+                cookingMethod: duplicate.cookingMethod as 'raw' | 'grilling' | 'poaching' | 'frying' | 'braising' | 'boiling' | 'other',
                 instructions: duplicate.instructions
               },
               existingTitles
@@ -97,7 +99,7 @@ export class MealService {
               description: variation.description,
               type: variation.type,
               cookingTime: variation.cookingTime,
-              cookingMethod: variation.cookingMethod,
+              cookingMethod: variation.cookingMethod as 'raw' | 'grilled' | 'fried' | 'baked' | 'boiled' | 'steamed' | 'other',
               ingredients: variation.ingredients || duplicate.ingredients,
               instructions: variation.instructions,
               categories: variation.categories,
@@ -628,6 +630,208 @@ Return ONLY the title. Do not include quotes, explanations, or additional text.`
       console.error('Error getting meals needing enhancement:', error);
       throw error;
     }
+  }
+
+  /**
+   * Fixes existing meals that don't match the new structure
+   * @returns Promise<{success: number, failed: number, results: Array<{id: string, oldStructure: any, newStructure: any, success: boolean, error?: string}>}>
+   */
+  async fixMealStructure(): Promise<{
+    success: number;
+    failed: number;
+    results: Array<{
+      id: string;
+      oldStructure: any;
+      newStructure: any;
+      success: boolean;
+      error?: string;
+    }>;
+  }> {
+    try {
+      console.log('🔧 Starting meal structure fix process...');
+      
+      const allMeals = await getDocs(this.collectionRef);
+      console.log(`Found ${allMeals.size} total meals to check`);
+      
+      const results: Array<{
+        id: string;
+        oldStructure: any;
+        newStructure: any;
+        success: boolean;
+        error?: string;
+      }> = [];
+      
+      let successCount = 0;
+      let failedCount = 0;
+
+      for (const docSnapshot of allMeals.docs) {
+        const mealData = docSnapshot.data() as FirestoreMeal;
+        const mealId = docSnapshot.id;
+        
+        try {
+          console.log(`Checking meal structure for: ${mealData.title || mealId}`);
+          
+          const oldStructure = { ...mealData };
+          const updates: Partial<FirestoreMeal> = {};
+          let hasChanges = false;
+
+          // Fix cookingMethod if it's not one of the allowed values
+          if (mealData.cookingMethod && 
+              !['raw', 'grilled', 'fried', 'baked', 'boiled', 'steamed', 'other'].includes(mealData.cookingMethod)) {
+            console.log(`Fixing cookingMethod from "${mealData.cookingMethod}" to "other"`);
+            updates.cookingMethod = 'other';
+            hasChanges = true;
+          }
+
+          // Fix ingredients structure if it's not in the correct format
+          if (mealData.ingredients) {
+            const fixedIngredients: { [key: string]: string } = {};
+            let ingredientsChanged = false;
+            
+            for (const [key, value] of Object.entries(mealData.ingredients)) {
+              // Check if the value already has units (contains common unit patterns)
+              const hasUnits = /\b(cup|tbsp|tsp|g|kg|ml|l|oz|lb|piece|slice|clove|bunch|head|can|jar|pack|bag|dash|pinch)\b/i.test(value);
+              
+              if (!hasUnits) {
+                // Add default unit if none exists
+                const defaultUnit = this.getDefaultUnitForIngredient(key);
+                fixedIngredients[key] = `${value} ${defaultUnit}`;
+                ingredientsChanged = true;
+                console.log(`Fixed ingredient "${key}": "${value}" -> "${fixedIngredients[key]}"`);
+              } else {
+                fixedIngredients[key] = value;
+              }
+            }
+            
+            if (ingredientsChanged) {
+              updates.ingredients = fixedIngredients;
+              hasChanges = true;
+            }
+          }
+
+          // Fix suggestions structure if it's missing or incorrect
+          if (!mealData.suggestions || 
+              !mealData.suggestions.improvements || 
+              !mealData.suggestions.alternatives || 
+              !mealData.suggestions.additions) {
+            
+            const fixedSuggestions = {
+              improvements: Array.isArray(mealData.suggestions?.improvements) ? mealData.suggestions.improvements : [],
+              alternatives: Array.isArray(mealData.suggestions?.alternatives) ? mealData.suggestions.alternatives : [],
+              additions: Array.isArray(mealData.suggestions?.additions) ? mealData.suggestions.additions : []
+            };
+            
+            updates.suggestions = fixedSuggestions;
+            hasChanges = true;
+            console.log(`Fixed suggestions structure for meal: ${mealData.title || mealId}`);
+          }
+
+          // Update the meal if we have changes
+          if (hasChanges) {
+            updates.updatedAt = Timestamp.now();
+            
+            await updateDoc(doc(this.collectionRef, mealId), updates);  // Fixed: Added await and proper type for doc
+            
+            const newStructure = { ...oldStructure, ...updates };
+            
+            results.push({
+              id: mealId,
+              oldStructure,
+              newStructure,
+              success: true
+            });
+            
+            successCount++;
+            console.log(`✅ Successfully fixed structure for meal: ${mealData.title || mealId}`);
+          } else {
+            // No changes needed
+            results.push({
+              id: mealId,
+              oldStructure,
+              newStructure: oldStructure,
+              success: true
+            });
+            successCount++;
+          }
+          
+          // Small delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+        } catch (error) {
+          console.error(`❌ Error fixing meal ${mealId}:`, error);
+          results.push({
+            id: mealId,
+            oldStructure: mealData,
+            newStructure: mealData,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+          failedCount++;
+        }
+      }
+
+      console.log(`🔧 Meal structure fix completed. Success: ${successCount}, Failed: ${failedCount}`);
+      
+      return {
+        success: successCount,
+        failed: failedCount,
+        results
+      };
+      
+    } catch (error) {
+      console.error('Error fixing meal structure:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Gets a default unit for an ingredient based on its name
+   * @param ingredientName The name of the ingredient
+   * @returns string The default unit
+   */
+  private getDefaultUnitForIngredient(ingredientName: string): string {
+    const name = ingredientName.toLowerCase();
+    
+    // Protein ingredients
+    if (name.includes('chicken') || name.includes('beef') || name.includes('pork') || 
+        name.includes('fish') || name.includes('salmon') || name.includes('tuna') ||
+        name.includes('shrimp') || name.includes('lamb') || name.includes('turkey')) {
+      return 'piece';
+    }
+    
+    // Vegetable ingredients
+    if (name.includes('tomato') || name.includes('onion') || name.includes('garlic') ||
+        name.includes('carrot') || name.includes('potato') || name.includes('bell pepper') ||
+        name.includes('cucumber') || name.includes('lettuce') || name.includes('spinach')) {
+      return 'piece';
+    }
+    
+    // Fruit ingredients
+    if (name.includes('apple') || name.includes('banana') || name.includes('orange') ||
+        name.includes('strawberry') || name.includes('grape') || name.includes('mango')) {
+      return 'piece';
+    }
+    
+    // Grain ingredients
+    if (name.includes('rice') || name.includes('pasta') || name.includes('bread') ||
+        name.includes('quinoa') || name.includes('oat') || name.includes('flour')) {
+      return 'cup';
+    }
+    
+    // Liquid ingredients
+    if (name.includes('oil') || name.includes('vinegar') || name.includes('sauce') ||
+        name.includes('broth') || name.includes('milk') || name.includes('water')) {
+      return 'tbsp';
+    }
+    
+    // Spice/herb ingredients
+    if (name.includes('salt') || name.includes('pepper') || name.includes('oregano') ||
+        name.includes('basil') || name.includes('thyme') || name.includes('cumin')) {
+      return 'tsp';
+    }
+    
+    // Default to piece for unknown ingredients
+    return 'piece';
   }
 
 

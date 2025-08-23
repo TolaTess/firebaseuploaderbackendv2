@@ -6,8 +6,10 @@ interface EnhancedMealData {
   description?: string;
   type?: 'protein' | 'grain' | 'vegetable' | 'fruit';
   cookingTime?: string;
-  cookingMethod?: string;
-  ingredients?: Record<string, string>;
+  cookingMethod?: 'raw' | 'grilled' | 'fried' | 'baked' | 'boiled' | 'steamed' | 'other';
+  ingredients?: {
+    [key: string]: string; // amount with unit (e.g., '1 cup', '200g')
+  };
   instructions?: string[];
   nutritionalInfo?: {
     calories: number;
@@ -29,8 +31,10 @@ interface MealVariation {
   description?: string;
   type?: 'protein' | 'grain' | 'vegetable' | 'fruit';
   cookingTime?: string;
-  cookingMethod?: string;
-  ingredients?: Record<string, string>;
+  cookingMethod?: 'raw' | 'grilled' | 'fried' | 'baked' | 'boiled' | 'steamed' | 'other';
+  ingredients?: {
+    [key: string]: string; // amount with unit (e.g., '1 cup', '200g')
+  };
   instructions?: string[];
   nutritionalInfo?: {
     calories: number;
@@ -71,11 +75,11 @@ interface EnhancedIngredientData {
   };
   categories?: string[];
   features?: {
-    fiber: string;
-    g_i: string;
-    season: string;
-    water: string;
-    rainbow: string;
+    fiber: string; // e.g., "10g"
+    g_i: string; // glycemic index e.g., "40", "low", "medium", "high"
+    season: 'spring' | 'summer' | 'autumn' | 'winter' | 'year-round' | 'fall/winter' | 'spring/summer';
+    water: string; // e.g., "10%"
+    rainbow: 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple' | 'white' | 'brown' | 'pink' | 'black';
   };
   techniques?: string[];
   storageOptions?: {
@@ -311,11 +315,11 @@ export class GeminiService {
             macros: { protein: '0', carbs: '0', fat: '0' },
             categories: ['fallback'],
             features: {
-              fiber: '0',
-              g_i: '0',
-              season: 'unknown',
-              water: '0',
-              rainbow: 'unknown'
+              fiber: 'low',
+              g_i: 'low',
+              season: 'year-round',
+              water: 'low',
+              rainbow: 'white'
             },
             techniques: ['fallback'],
             storageOptions: {
@@ -394,11 +398,11 @@ export class GeminiService {
             macros: originalIngredient.macros || { protein: '0', carbs: '0', fat: '0' },
             categories: originalIngredient.categories || ['fallback'],
             features: originalIngredient.features || {
-              fiber: '0',
-              g_i: '0',
-              season: 'unknown',
-              water: '0',
-              rainbow: 'unknown'
+              fiber: 'low',
+              g_i: 'low',
+              season: 'year-round',
+              water: 'low',
+              rainbow: 'white'
             },
             techniques: originalIngredient.techniques || ['fallback'],
             storageOptions: originalIngredient.storageOptions || {
@@ -471,9 +475,9 @@ export class GeminiService {
             features: {
               fiber: '0',
               g_i: '0',
-              season: 'unknown',
+              season: 'year-round',
               water: '0',
-              rainbow: 'unknown'
+              rainbow: 'white'
             },
             techniques: ['fallback'],
             storageOptions: {
@@ -770,7 +774,45 @@ export class GeminiService {
 
   // Prompt creation methods (simplified versions)
   private createVariationPrompt(meal: Partial<Meal>, existingTitles: string[]): string {
-    return `Create a unique variation of this meal: ${meal.title}. Existing titles to avoid: ${existingTitles.join(', ')}. Return JSON with title, description, type, cookingTime, cookingMethod, ingredients, instructions, nutritionalInfo, categories, serveQty, and suggestions.`;
+    return `Create a unique variation of this meal: ${meal.title}. Existing titles to avoid: ${existingTitles.join(', ')}. 
+
+Return a valid JSON object with the following structure (ensure all property names are double-quoted and all string values are properly quoted):
+
+{
+  "title": "string",
+  "description": "string",
+  "type": "string",
+  "cookingTime": "string",
+  "cookingMethod": "raw|grilled|fried|baked|boiled|steamed|other",
+  "ingredients": {
+    "ingredient1": "amount with unit (e.g., '1 cup', '200g')",
+    "ingredient2": "amount with unit"
+  },
+  "instructions": ["string"],
+   "nutritionalInfo": {
+        "calories": 0,
+        "protein": 0,
+        "carbs": 0,
+        "fat": 0,
+        "fiber": 0,
+        "sugar": 0,
+        "sodium": 0
+      }
+  "categories": ["string"],
+  "serveQty": "string",
+  "suggestions": {
+    "improvements": ["suggestion1", "suggestion2"],
+    "alternatives": ["alternative1", "alternative2"],
+    "additions": ["addition1", "addition2"]
+  }
+}
+
+IMPORTANT RULES:
+1. Return ONLY the JSON object. Do not include any code examples, explanations, or other text.
+2. The "cookingMethod" must be one of: raw, grilling, poaching, frying, braising, boiling, or other
+3. The "ingredients" object should contain ingredient names as keys and amounts with units as values (e.g., "tomatoes": "2 cups", "olive oil": "2 tablespoons")
+4. The "suggestions" object must contain: improvements, alternatives, and additions arrays
+5. Ensure the JSON is properly formatted with double quotes around all property names and string values.`;
   }
 
   private createCookingMethodPrompt(cookingMethod: Partial<CookingMethod>): string {
@@ -811,16 +853,28 @@ Return a valid JSON object with the following structure (ensure all property nam
   "description": "string",
   "type": "string",
   "cookingTime": "string",
-  "cookingMethod": "string",
-  "ingredients": {},
+  "cookingMethod": "raw|grilled|fried|baked|boiled|steamed|other",
+  "ingredients": {
+    "ingredient1": "amount with unit (e.g., '1 cup', '200g')",
+    "ingredient2": "amount with unit"
+  },
   "instructions": ["string"],
   "nutritionalInfo": {},
   "categories": ["string"],
   "serveQty": "string",
-  "suggestions": ["string"]
+  "suggestions": {
+    "improvements": ["suggestion1", "suggestion2"],
+    "alternatives": ["alternative1", "alternative2"],
+    "additions": ["addition1", "addition2"]
+  }
 }
 
-Ensure the JSON is properly formatted with double quotes around all property names and string values.`;
+IMPORTANT RULES:
+1. Return ONLY the JSON object. Do not include any code examples, explanations, or other text.
+2. The "cookingMethod" must be one of: raw, grilled, fried, baked, boiled, steamed, or other
+3. The "ingredients" object should contain ingredient names as keys and amounts with units as values (e.g., "tomatoes": "2 cups", "olive oil": "2 tablespoons")
+4. The "suggestions" object must contain: improvements, alternatives, and additions arrays
+5. Ensure the JSON is properly formatted with double quotes around all property names and string values.`;
   }
 
   private createIngredientVariationPrompt(ingredient: Partial<Ingredient>, existingTitles: string[]): string {
@@ -977,17 +1031,17 @@ Ensure the JSON is properly formatted with double quotes around all property nam
   private validateAndCorrectFeatures(features: any): {
     fiber: string;
     g_i: string;
-    season: string;
+    season: 'spring' | 'summer' | 'autumn' | 'winter' | 'year-round' | 'fall/winter' | 'spring/summer';
     water: string;
-    rainbow: string;
+    rainbow: 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple' | 'white' | 'brown' | 'pink' | 'black';
   } {
     const requiredFeatures = ['fiber', 'g_i', 'season', 'water', 'rainbow'];
     const fallbackFeatures = {
       fiber: 'low',
       g_i: 'low',
-      season: 'year-round',
+      season: 'year-round' as const,
       water: 'low',
-      rainbow: 'unknown'
+      rainbow: 'white' as const
     };
 
     if (!features || typeof features !== 'object') {
@@ -995,11 +1049,23 @@ Ensure the JSON is properly formatted with double quotes around all property nam
       return fallbackFeatures;
     }
 
-    const correctedFeatures = { ...fallbackFeatures };
+    const correctedFeatures: typeof fallbackFeatures = { ...fallbackFeatures };
     
     for (const feature of requiredFeatures) {
       if (features[feature] && typeof features[feature] === 'string') {
-        correctedFeatures[feature as keyof typeof correctedFeatures] = features[feature];
+        if (feature === 'season') {
+          const seasonValue = features[feature];
+          if (['spring', 'summer', 'autumn', 'winter', 'year-round', 'fall/winter', 'spring/summer'].includes(seasonValue)) {
+            correctedFeatures.season = seasonValue as any;
+          }
+        } else if (feature === 'rainbow') {
+          const rainbowValue = features[feature];
+          if (['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'white', 'brown', 'pink', 'black'].includes(rainbowValue)) {
+            correctedFeatures.rainbow = rainbowValue as any;
+          }
+        } else if (feature === 'fiber' || feature === 'g_i' || feature === 'water') {
+          correctedFeatures[feature] = features[feature];
+        }
       }
     }
 
@@ -1138,11 +1204,11 @@ Return a valid JSON object with the following structure (ensure all property nam
   },
   "categories": ["string"],
   "features": {
-    "fiber": "string",
-    "g_i": "string",
-    "season": "string",
-    "water": "string",
-    "rainbow": "string"
+    "fiber": "string (e.g., '10g')",
+    "g_i": "string (e.g., '40', 'low', 'medium', 'high')",
+    "season": "spring|summer|autumn|winter|year-round|fall/winter|spring/summer",
+    "water": "string (e.g., '10%')",
+    "rainbow": "red|orange|yellow|green|blue|purple|white|brown|pink|black"
   },
   "techniques": [
     "string"
@@ -1173,8 +1239,12 @@ IMPORTANT RULES:
    - "sautéing"
    - "soup"
 5. The "storageOptions" object must ONLY contain: countertop, fridge, freezer
-6. "rainbow" should be the ingredient color (e.g., "green" for broccoli, "red" for tomatoes)
-7. The response should be valid JSON that can be parsed directly.
+6. "rainbow" must be one of: red, orange, yellow, green, blue, purple, white, brown, pink, black (NOT a number)
+7. "season" must be one of: spring, summer, autumn, winter, year-round, fall/winter, spring/summer
+8. "fiber" should include units when possible (e.g., "10g", "high", "low")
+9. "g_i" should be the glycemic index number or category (e.g., "40", "low", "medium", "high")
+10. "water" should include percentage when possible (e.g., "10%", "high", "low")
+11. The response should be valid JSON that can be parsed directly.
 
 Ensure the JSON is properly formatted with double quotes around all property names and string values.`;
   }
@@ -1497,11 +1567,11 @@ Ensure the JSON is properly formatted with double quotes around all property nam
         macros: { protein: '0', carbs: '0', fat: '0' },
         categories: ['fallback'],
         features: {
-          fiber: '0',
-          g_i: '0',
-          season: 'unknown',
-          water: '0',
-          rainbow: 'unknown'
+          fiber: 'low',
+          g_i: 'low',
+          season: 'year-round',
+          water: 'low',
+          rainbow: 'white'
         },
         techniques: ['fallback'],
         storageOptions: {

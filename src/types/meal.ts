@@ -24,8 +24,10 @@ export interface Meal {
   description?: string;
   type?: 'protein' | 'grain' | 'vegetable' | 'fruit';
   cookingTime?: string;
-  cookingMethod?: string;
-  ingredients: Record<string, string>;
+  cookingMethod?: 'raw' | 'grilling' | 'poaching' | 'frying' | 'braising' | 'boiling' | 'other';
+  ingredients: {
+    [key: string]: string; // amount with unit (e.g., '1 cup', '200g')
+  };
   instructions?: string[];
   nutritionalInfo?: Nutrition;
   categories?: string[];
