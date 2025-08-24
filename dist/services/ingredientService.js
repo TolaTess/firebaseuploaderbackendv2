@@ -216,6 +216,288 @@ class IngredientService {
         }
     }
     /**
+     * Enhanced ingredient enhancement with improved features mapping
+     * @returns Promise<number> Number of ingredients enhanced
+     */
+    async updateIngredientsWithEnhancedGeminiEnhancement() {
+        try {
+            const ingredientsToUpdate = await this.getIngredientsNeedingEnhancement();
+            let updatedCount = 0;
+            for (const ingredient of ingredientsToUpdate) {
+                try {
+                    console.log(`🔧 Enhanced enhancement for ingredient: ${ingredient.title}`);
+                    // Use Gemini to enhance ingredient details with improved features
+                    const enhancedData = await this.geminiService.enhanceIngredientDetails({
+                        title: ingredient.title,
+                        type: ingredient.type,
+                        calories: ingredient.calories,
+                        macros: ingredient.macros,
+                        categories: ingredient.categories,
+                        features: ingredient.features,
+                        techniques: ingredient.techniques,
+                        storageOptions: ingredient.storageOptions
+                    });
+                    const updates = {
+                        updatedAt: firestore_1.Timestamp.now()
+                    };
+                    // Enhanced features mapping with validation
+                    if (enhancedData.features) {
+                        const validatedFeatures = this.validateAndCorrectIngredientFeatures(enhancedData.features);
+                        updates.features = validatedFeatures;
+                        console.log(`✅ Enhanced features for ${ingredient.title}:`, validatedFeatures);
+                    }
+                    // Update other fields with enhanced data
+                    if (enhancedData.title && !ingredient.title) {
+                        updates.title = enhancedData.title;
+                    }
+                    if (enhancedData.type && !ingredient.type) {
+                        updates.type = enhancedData.type;
+                    }
+                    if (enhancedData.calories && !ingredient.calories) {
+                        updates.calories = enhancedData.calories;
+                    }
+                    if (enhancedData.macros && (!ingredient.macros || Object.keys(ingredient.macros).length === 0)) {
+                        updates.macros = enhancedData.macros;
+                    }
+                    if (enhancedData.categories && (!ingredient.categories || ingredient.categories.length === 0)) {
+                        updates.categories = enhancedData.categories;
+                    }
+                    if (enhancedData.techniques && (!ingredient.techniques || ingredient.techniques.length === 0)) {
+                        updates.techniques = enhancedData.techniques;
+                    }
+                    if (enhancedData.storageOptions && (!ingredient.storageOptions || Object.keys(ingredient.storageOptions).length === 0)) {
+                        updates.storageOptions = enhancedData.storageOptions;
+                    }
+                    if (enhancedData.isAntiInflammatory !== undefined && ingredient.isAntiInflammatory === undefined) {
+                        updates.isAntiInflammatory = enhancedData.isAntiInflammatory;
+                    }
+                    if (enhancedData.alt && (!ingredient.alt || ingredient.alt.length === 0)) {
+                        updates.alt = enhancedData.alt;
+                    }
+                    if (enhancedData.image && !ingredient.image) {
+                        updates.image = enhancedData.image;
+                    }
+                    // Update the ingredient if we have new information
+                    if (Object.keys(updates).length > 1 && ingredient.id) { // More than just updatedAt
+                        await (0, firestore_1.updateDoc)((0, firestore_1.doc)(this.collectionRef, ingredient.id), updates);
+                        updatedCount++;
+                        console.log(`✅ Successfully enhanced ingredient ${ingredient.id} with improved features`);
+                    }
+                    // Small delay to avoid rate limiting
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+                catch (error) {
+                    console.error(`❌ Error enhancing ingredient ${ingredient.id}:`, error);
+                    // Continue with other ingredients even if one fails
+                }
+            }
+            return updatedCount;
+        }
+        catch (error) {
+            console.error('Error updating ingredients with enhanced Gemini enhancement:', error);
+            throw error;
+        }
+    }
+    /**
+     * Fixes existing ingredients that don't match the new structure
+     * @returns Promise<{success: number, failed: number, results: Array<{id: string, oldStructure: any, newStructure: any, success: boolean, error?: string}>}>
+     */
+    async fixIngredientStructure() {
+        try {
+            console.log('🔧 Starting ingredient structure fix process...');
+            const allIngredients = await (0, firestore_1.getDocs)(this.collectionRef);
+            console.log(`Found ${allIngredients.size} total ingredients to check`);
+            const results = [];
+            let successCount = 0;
+            let failedCount = 0;
+            for (const docSnapshot of allIngredients.docs) {
+                const ingredientData = docSnapshot.data();
+                const ingredientId = docSnapshot.id;
+                try {
+                    console.log(`Checking ingredient structure for: ${ingredientData.title || ingredientId}`);
+                    const oldStructure = { ...ingredientData };
+                    const updates = {};
+                    let hasChanges = false;
+                    // Fix features structure if it's missing or incorrect
+                    if (!ingredientData.features ||
+                        !ingredientData.features.fiber ||
+                        !ingredientData.features.g_i ||
+                        !ingredientData.features.season ||
+                        !ingredientData.features.water ||
+                        !ingredientData.features.rainbow) {
+                        const fixedFeatures = this.validateAndCorrectIngredientFeatures(ingredientData.features || {});
+                        updates.features = fixedFeatures;
+                        hasChanges = true;
+                        console.log(`Fixed features structure for ingredient: ${ingredientData.title || ingredientId}`);
+                    }
+                    else {
+                        // Validate existing features and fix if needed
+                        const validatedFeatures = this.validateAndCorrectIngredientFeatures(ingredientData.features);
+                        if (JSON.stringify(validatedFeatures) !== JSON.stringify(ingredientData.features)) {
+                            updates.features = validatedFeatures;
+                            hasChanges = true;
+                            console.log(`Validated and fixed features for ingredient: ${ingredientData.title || ingredientId}`);
+                        }
+                    }
+                    // Fix techniques if missing
+                    if (!ingredientData.techniques || ingredientData.techniques.length === 0) {
+                        updates.techniques = ['raw']; // Default to raw as safe fallback
+                        hasChanges = true;
+                        console.log(`Added default techniques for ingredient: ${ingredientData.title || ingredientId}`);
+                    }
+                    // Fix storage options if missing
+                    if (!ingredientData.storageOptions ||
+                        !ingredientData.storageOptions.countertop ||
+                        !ingredientData.storageOptions.fridge ||
+                        !ingredientData.storageOptions.freezer) {
+                        const fixedStorageOptions = {
+                            countertop: 'not recommended',
+                            fridge: 'recommended',
+                            freezer: 'not recommended'
+                        };
+                        updates.storageOptions = fixedStorageOptions;
+                        hasChanges = true;
+                        console.log(`Fixed storage options for ingredient: ${ingredientData.title || ingredientId}`);
+                    }
+                    // Update the ingredient if we have changes
+                    if (hasChanges) {
+                        updates.updatedAt = firestore_1.Timestamp.now();
+                        await (0, firestore_1.updateDoc)((0, firestore_1.doc)(this.collectionRef, ingredientId), updates);
+                        const newStructure = { ...oldStructure, ...updates };
+                        results.push({
+                            id: ingredientId,
+                            oldStructure,
+                            newStructure,
+                            success: true
+                        });
+                        successCount++;
+                        console.log(`✅ Successfully fixed structure for ingredient: ${ingredientData.title || ingredientId}`);
+                    }
+                    else {
+                        // No changes needed
+                        results.push({
+                            id: ingredientId,
+                            oldStructure,
+                            newStructure: oldStructure,
+                            success: true
+                        });
+                        successCount++;
+                    }
+                    // Small delay to avoid rate limiting
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                catch (error) {
+                    console.error(`❌ Error fixing ingredient ${ingredientId}:`, error);
+                    results.push({
+                        id: ingredientId,
+                        oldStructure: ingredientData,
+                        newStructure: ingredientData,
+                        success: false,
+                        error: error instanceof Error ? error.message : 'Unknown error'
+                    });
+                    failedCount++;
+                }
+            }
+            console.log(`🔧 Ingredient structure fix completed. Success: ${successCount}, Failed: ${failedCount}`);
+            return {
+                success: successCount,
+                failed: failedCount,
+                results
+            };
+        }
+        catch (error) {
+            console.error('Error fixing ingredient structure:', error);
+            throw error;
+        }
+    }
+    /**
+     * Validates and corrects ingredient features to match the new structure
+     * @param features The features to validate
+     * @returns Validated features object
+     */
+    validateAndCorrectIngredientFeatures(features) {
+        const fallbackFeatures = {
+            fiber: '0',
+            g_i: '0',
+            season: 'year-round',
+            water: '0',
+            rainbow: 'white'
+        };
+        if (!features || typeof features !== 'object') {
+            console.log('Features is not an object, using fallback');
+            return fallbackFeatures;
+        }
+        const correctedFeatures = { ...fallbackFeatures };
+        // Validate and correct fiber
+        if (features.fiber && typeof features.fiber === 'string') {
+            correctedFeatures.fiber = features.fiber;
+        }
+        // Validate and correct g_i (glycemic index)
+        if (features.g_i && typeof features.g_i === 'string') {
+            correctedFeatures.g_i = features.g_i;
+        }
+        // Validate and correct season
+        if (features.season && typeof features.season === 'string') {
+            const seasonValue = features.season.toLowerCase();
+            if (['spring', 'summer', 'autumn', 'winter', 'year-round', 'fall/winter', 'spring/summer'].includes(seasonValue)) {
+                correctedFeatures.season = seasonValue;
+            }
+        }
+        // Validate and correct water
+        if (features.water && typeof features.water === 'string') {
+            correctedFeatures.water = features.water;
+        }
+        // Validate and correct rainbow (must be a color, not a number)
+        if (features.rainbow && typeof features.rainbow === 'string') {
+            const rainbowValue = features.rainbow.toLowerCase();
+            if (['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'white', 'brown', 'pink', 'black'].includes(rainbowValue)) {
+                correctedFeatures.rainbow = rainbowValue;
+            }
+            else {
+                // If it's a number or invalid value, try to map it to a color based on common patterns
+                const mappedColor = this.mapNumberToColor(features.rainbow);
+                correctedFeatures.rainbow = mappedColor;
+            }
+        }
+        return correctedFeatures;
+    }
+    /**
+     * Maps numeric or invalid rainbow values to appropriate colors
+     * @param value The value to map
+     * @returns A valid color or null if no mapping found
+     */
+    mapNumberToColor(value) {
+        const numValue = parseInt(value);
+        if (isNaN(numValue)) {
+            // Try to extract color from text
+            const colorMatch = value.toLowerCase().match(/(red|orange|yellow|green|blue|purple|white|brown|pink|black)/);
+            if (colorMatch) {
+                return colorMatch[1];
+            }
+            return 'white'; // Default fallback
+        }
+        // Map numbers to colors based on common patterns
+        if (numValue <= 10)
+            return 'white';
+        if (numValue <= 20)
+            return 'yellow';
+        if (numValue <= 30)
+            return 'orange';
+        if (numValue <= 40)
+            return 'red';
+        if (numValue <= 50)
+            return 'pink';
+        if (numValue <= 60)
+            return 'purple';
+        if (numValue <= 70)
+            return 'blue';
+        if (numValue <= 80)
+            return 'green';
+        if (numValue <= 90)
+            return 'brown';
+        return 'black';
+    }
+    /**
      * Retrieves ingredients that need enhancement with missing details
      * @returns Promise<FirestoreIngredient[]>
      */

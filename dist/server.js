@@ -39,7 +39,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
-const node_cron_1 = __importDefault(require("node-cron"));
 const mealService_1 = require("./services/mealService");
 const ingredientService_1 = require("./services/ingredientService");
 const collectionsService_1 = require("./services/collectionsService");
@@ -316,6 +315,51 @@ app.post('/api/create-routines', async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+app.post('/api/fix-meal-structure', async (req, res) => {
+    try {
+        console.log('Manual meal structure fix triggered');
+        const result = await mealService.fixMealStructure();
+        res.json({
+            success: true,
+            message: `Fixed meal structure: ${result.success} successful, ${result.failed} failed`,
+            result
+        });
+    }
+    catch (error) {
+        console.error('Error fixing meal structure:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+app.post('/api/fix-ingredient-structure', async (req, res) => {
+    try {
+        console.log('Manual ingredient structure fix triggered');
+        const result = await ingredientService.fixIngredientStructure();
+        res.json({
+            success: true,
+            message: `Fixed ingredient structure: ${result.success} successful, ${result.failed} failed`,
+            result
+        });
+    }
+    catch (error) {
+        console.error('Error fixing ingredient structure:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+app.post('/api/enhanced-ingredient-enhancement', async (req, res) => {
+    try {
+        console.log('Manual enhanced ingredient enhancement triggered');
+        const count = await ingredientService.updateIngredientsWithEnhancedGeminiEnhancement();
+        res.json({
+            success: true,
+            message: `Enhanced ${count} ingredients with improved features`,
+            enhancedCount: count
+        });
+    }
+    catch (error) {
+        console.error('Error with enhanced ingredient enhancement:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 app.get('/api/programs-summary', async (req, res) => {
     try {
         console.log('Programs summary requested');
@@ -339,6 +383,22 @@ app.post('/api/enhance-all', async (req, res) => {
             programs: 0,
             routines: 0
         };
+        // Fix meal structure
+        try {
+            const mealStructureFix = await mealService.fixMealStructure();
+            console.log(`Fixed meal structure: ${mealStructureFix.success} successful, ${mealStructureFix.failed} failed`);
+        }
+        catch (error) {
+            console.error('Error fixing meal structure:', error);
+        }
+        // Fix ingredient structure
+        try {
+            const ingredientStructureFix = await ingredientService.fixIngredientStructure();
+            console.log(`Fixed ingredient structure: ${ingredientStructureFix.success} successful, ${ingredientStructureFix.failed} failed`);
+        }
+        catch (error) {
+            console.error('Error fixing ingredient structure:', error);
+        }
         // Enhance meals
         try {
             results.meals = await mealService.updateMealsWithGeminiEnhancement();
@@ -354,6 +414,14 @@ app.post('/api/enhance-all', async (req, res) => {
         }
         catch (error) {
             console.error('Error enhancing ingredients:', error);
+        }
+        // Enhanced ingredient enhancement with improved features
+        try {
+            const enhancedIngredientEnhancements = await ingredientService.updateIngredientsWithEnhancedGeminiEnhancement();
+            console.log(`Enhanced ${enhancedIngredientEnhancements} ingredients with improved features`);
+        }
+        catch (error) {
+            console.error('Error with enhanced ingredient enhancement:', error);
         }
         // Enhance cooking methods
         try {
@@ -396,140 +464,93 @@ app.post('/api/enhance-all', async (req, res) => {
 });
 // Schedule cron jobs with new workflow system
 const scheduleJobs = () => {
-    // Step 1: Data Analysis and Duplicate Detection (1 AM)
-    node_cron_1.default.schedule('0 1 * * *', async () => {
-        try {
-            console.log('🔄 Scheduled workflow step 1 started at:', new Date().toISOString());
-            console.log('📊 Step 1: Data Analysis and Duplicate Detection');
-            const { WorkflowOrchestrator } = await Promise.resolve().then(() => __importStar(require('./services/workflowOrchestrator')));
-            const orchestrator = new WorkflowOrchestrator();
-            // Execute data analysis and duplicate detection steps
-            const analysisResult = await orchestrator.executeSpecificStep('data-analysis', 'all');
-            console.log('✅ Data analysis completed:', analysisResult.summary);
-            const duplicateResult = await orchestrator.executeSpecificStep('duplicate-detection', 'all');
-            console.log('✅ Duplicate detection completed:', duplicateResult);
-            console.log('🔄 Step 1 completed successfully');
-        }
-        catch (error) {
-            console.error('❌ Scheduled workflow step 1 failed:', error);
-        }
-    });
-    // Step 2: Title Validation and Addition (2 AM)
-    node_cron_1.default.schedule('0 2 * * *', async () => {
-        try {
-            console.log('🔄 Scheduled workflow step 2 started at:', new Date().toISOString());
-            console.log('📝 Step 2: Title Validation and Addition');
-            const { WorkflowOrchestrator } = await Promise.resolve().then(() => __importStar(require('./services/workflowOrchestrator')));
-            const orchestrator = new WorkflowOrchestrator();
-            // Execute title validation and addition steps
-            const titleValidationResult = await orchestrator.executeSpecificStep('title-validation', 'all');
-            console.log('✅ Title validation completed:', titleValidationResult);
-            const titleAdditionResult = await orchestrator.executeSpecificStep('title-addition', 'all');
-            console.log('✅ Title addition completed:', titleAdditionResult);
-            console.log('🔄 Step 2 completed successfully');
-        }
-        catch (error) {
-            console.error('❌ Scheduled workflow step 2 failed:', error);
-        }
-    });
-    // Step 3: Type Check and Fix (3 AM)
-    node_cron_1.default.schedule('0 3 * * *', async () => {
-        try {
-            console.log('🔄 Scheduled workflow step 3 started at:', new Date().toISOString());
-            console.log('🔧 Step 3: Type Check and Fix');
-            const { WorkflowOrchestrator } = await Promise.resolve().then(() => __importStar(require('./services/workflowOrchestrator')));
-            const orchestrator = new WorkflowOrchestrator();
-            // Execute type check and fix
-            const typeCheckResult = await orchestrator.executeSpecificStep('type-check-and-fix', 'all');
-            console.log('✅ Type check and fix completed:', typeCheckResult);
-            console.log('🔧 Step 3 completed successfully');
-        }
-        catch (error) {
-            console.error('❌ Scheduled workflow step 3 failed:', error);
-        }
-    });
-    // Step 3.5: Title and Duplication Fix (3:30 AM)
-    node_cron_1.default.schedule('30 3 * * *', async () => {
-        try {
-            console.log('🔄 Scheduled workflow step 3.5 started at:', new Date().toISOString());
-            console.log('📝 Step 3.5: Title and Duplication Fix');
-            const { WorkflowOrchestrator } = await Promise.resolve().then(() => __importStar(require('./services/workflowOrchestrator')));
-            const orchestrator = new WorkflowOrchestrator();
-            // Execute title and duplication fix
-            const titleDuplicationResult = await orchestrator.executeSpecificStep('title-and-duplication-fix', 'all');
-            console.log('✅ Title and duplication fix completed:', titleDuplicationResult);
-            console.log('📝 Step 3.5 completed successfully');
-        }
-        catch (error) {
-            console.error('❌ Scheduled workflow step 3.5 failed:', error);
-        }
-    });
-    // Step 4: Enhancement Execution (4 AM) - Overall enhancement checks
-    node_cron_1.default.schedule('0 4 * * *', async () => {
-        try {
-            console.log('🔄 Scheduled workflow step 4 started at:', new Date().toISOString());
-            console.log('✨ Step 4: Enhancement Execution (Overall enhancement checks)');
-            const { WorkflowOrchestrator } = await Promise.resolve().then(() => __importStar(require('./services/workflowOrchestrator')));
-            const orchestrator = new WorkflowOrchestrator();
-            // Execute enhancement step with built-in rate limiting
-            const enhancementResult = await orchestrator.executeSpecificStep('enhancement-execution', 'all');
-            console.log('✅ Enhancement execution completed:', enhancementResult);
-            // Additional enhancements with proper spacing
-            console.log('🔄 Running additional enhancements with rate limiting...');
-            const results = {
-                cookingMethods: 0,
-                dietCategories: 0
-            };
-            // Enhance cooking methods
-            try {
-                console.log('🔄 Enhancing cooking methods...');
-                results.cookingMethods = await collectionsService.enhanceCookingMethods();
-                console.log(`✅ Enhanced ${results.cookingMethods} cooking methods`);
-            }
-            catch (error) {
-                console.error('❌ Error enhancing cooking methods:', error);
-            }
-            // Wait 30 minutes before diet categories
-            console.log('⏳ Waiting 30 minutes before diet category enhancements...');
-            await new Promise(resolve => setTimeout(resolve, 30 * 60 * 1000));
-            // Enhance diet categories
-            try {
-                console.log('🔄 Enhancing diet categories...');
-                results.dietCategories = await collectionsService.enhanceDietCategories();
-                console.log(`✅ Enhanced ${results.dietCategories} diet categories`);
-            }
-            catch (error) {
-                console.error('❌ Error enhancing diet categories:', error);
-            }
-            console.log('✨ Step 4 completed successfully:', results);
-        }
-        catch (error) {
-            console.error('❌ Scheduled workflow step 4 failed:', error);
-        }
-    });
-    // Step 5: Complete workflow execution (5 AM) - for comprehensive runs
-    node_cron_1.default.schedule('0 5 * * *', async () => {
-        try {
-            console.log('🚀 Scheduled complete workflow execution started at:', new Date().toISOString());
-            console.log('🎯 Complete Workflow: Full data quality check');
-            const { WorkflowOrchestrator } = await Promise.resolve().then(() => __importStar(require('./services/workflowOrchestrator')));
-            const orchestrator = new WorkflowOrchestrator();
-            // Execute complete workflow with scope 'all'
-            const completeResult = await orchestrator.executeCompleteWorkflow('all');
-            console.log('🎉 Complete workflow execution finished:', completeResult.summary);
-        }
-        catch (error) {
-            console.error('❌ Scheduled complete workflow execution failed:', error);
-        }
-    });
-    console.log('✅ Cron jobs scheduled successfully with new workflow system');
-    console.log('📅 Schedule:');
-    console.log('   1 AM - Data Analysis & Duplicate Detection');
-    console.log('   2 AM - Title Validation & Addition');
-    console.log('   3 AM - Transformation Check & Execution (with 30min spacing)');
-    console.log('   4 AM - Enhancement Execution (with 30min spacing)');
-    console.log('   5 AM - Complete Workflow Execution (optional)');
+    // Initialize the weekly workflow scheduler
+    try {
+        const { WorkflowOrchestrator } = require('./services/workflowOrchestrator');
+        const orchestrator = new WorkflowOrchestrator();
+        // Start the weekly scheduler (runs every Sunday at 2 AM)
+        orchestrator.startWeeklyScheduler();
+        console.log('✅ Weekly workflow scheduler started successfully');
+        console.log('📅 Schedule: Every Sunday at 2 AM');
+        console.log('🎯 Scope: Complete workflow execution with scope "all"');
+    }
+    catch (error) {
+        console.error('❌ Failed to start weekly workflow scheduler:', error);
+        console.log('⚠️ Falling back to manual workflow execution only');
+    }
 };
+// Add scheduler control endpoints
+app.post('/api/scheduler/start', async (req, res) => {
+    try {
+        console.log('Manual scheduler start requested');
+        const { WorkflowOrchestrator } = await Promise.resolve().then(() => __importStar(require('./services/workflowOrchestrator')));
+        const orchestrator = new WorkflowOrchestrator();
+        orchestrator.startWeeklyScheduler();
+        res.json({
+            success: true,
+            message: 'Weekly scheduler started successfully',
+            schedule: 'Every Sunday at 2 AM'
+        });
+    }
+    catch (error) {
+        console.error('Error starting scheduler:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+app.post('/api/scheduler/stop', async (req, res) => {
+    try {
+        console.log('Manual scheduler stop requested');
+        const { WorkflowOrchestrator } = await Promise.resolve().then(() => __importStar(require('./services/workflowOrchestrator')));
+        const orchestrator = new WorkflowOrchestrator();
+        orchestrator.stopWeeklyScheduler();
+        res.json({
+            success: true,
+            message: 'Weekly scheduler stopped successfully'
+        });
+    }
+    catch (error) {
+        console.error('Error stopping scheduler:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+app.get('/api/scheduler/status', async (req, res) => {
+    try {
+        console.log('Scheduler status requested');
+        const { WorkflowOrchestrator } = await Promise.resolve().then(() => __importStar(require('./services/workflowOrchestrator')));
+        const orchestrator = new WorkflowOrchestrator();
+        const status = orchestrator.getSchedulerStatus();
+        res.json({
+            success: true,
+            scheduler: status,
+            message: status.isRunning
+                ? `Scheduler is running. Next run: ${status.nextRun}`
+                : 'Scheduler is not running'
+        });
+    }
+    catch (error) {
+        console.error('Error getting scheduler status:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+app.post('/api/scheduler/run-now', async (req, res) => {
+    try {
+        console.log('Manual weekly workflow execution requested');
+        const { WorkflowOrchestrator } = await Promise.resolve().then(() => __importStar(require('./services/workflowOrchestrator')));
+        const orchestrator = new WorkflowOrchestrator();
+        // Execute the complete workflow immediately
+        const result = await orchestrator.executeCompleteWorkflow('all');
+        res.json({
+            success: true,
+            message: 'Weekly workflow executed successfully',
+            result: result.summary,
+            timestamp: new Date().toISOString()
+        });
+    }
+    catch (error) {
+        console.error('Error executing weekly workflow:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 // Start the server
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);

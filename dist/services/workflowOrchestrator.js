@@ -10,6 +10,7 @@ class WorkflowOrchestrator {
     constructor() {
         this.dataDir = (0, path_1.join)(process.cwd(), 'data');
         this.workflowFile = (0, path_1.join)(this.dataDir, 'workflow-execution.json');
+        this.scheduleInterval = null;
         this.mealService = new mealService_1.MealService();
         this.ingredientService = new ingredientService_1.IngredientService();
         this.dataAnalysisService = new dataAnalysisService_1.DataAnalysisService();
@@ -23,6 +24,88 @@ class WorkflowOrchestrator {
             const fs = require('fs');
             fs.mkdirSync(this.dataDir, { recursive: true });
         }
+    }
+    /**
+     * Starts the weekly workflow scheduler (runs every Sunday)
+     */
+    startWeeklyScheduler() {
+        if (this.scheduleInterval) {
+            console.log('⚠️ Weekly scheduler is already running');
+            return;
+        }
+        console.log('📅 Starting weekly workflow scheduler (Sundays)');
+        // Calculate time until next Sunday
+        const now = new Date();
+        const daysUntilSunday = (7 - now.getDay()) % 7;
+        const nextSunday = new Date(now);
+        nextSunday.setDate(now.getDate() + daysUntilSunday);
+        nextSunday.setHours(2, 0, 0, 0); // Run at 2 AM on Sunday
+        const timeUntilNextSunday = nextSunday.getTime() - now.getTime();
+        console.log(`⏰ Next scheduled run: ${nextSunday.toLocaleString()}`);
+        // Schedule the first run
+        setTimeout(() => {
+            this.runScheduledWorkflow();
+            this.scheduleNextSunday();
+        }, timeUntilNextSunday);
+    }
+    /**
+     * Schedules the next Sunday run
+     */
+    scheduleNextSunday() {
+        // Schedule for next Sunday at 2 AM
+        const nextSunday = new Date();
+        nextSunday.setDate(nextSunday.getDate() + 7);
+        nextSunday.setHours(2, 0, 0, 0);
+        const timeUntilNextSunday = nextSunday.getTime() - Date.now();
+        this.scheduleInterval = setTimeout(() => {
+            this.runScheduledWorkflow();
+            this.scheduleNextSunday(); // Schedule the next one
+        }, timeUntilNextSunday);
+        console.log(`⏰ Next scheduled run: ${nextSunday.toLocaleString()}`);
+    }
+    /**
+     * Stops the weekly workflow scheduler
+     */
+    stopWeeklyScheduler() {
+        if (this.scheduleInterval) {
+            clearTimeout(this.scheduleInterval);
+            this.scheduleInterval = null;
+            console.log('⏹️ Weekly workflow scheduler stopped');
+        }
+        else {
+            console.log('⚠️ No scheduler running');
+        }
+    }
+    /**
+     * Runs the scheduled workflow
+     */
+    async runScheduledWorkflow() {
+        console.log('🕐 Running scheduled weekly workflow...');
+        try {
+            await this.executeCompleteWorkflow('all');
+            console.log('✅ Scheduled weekly workflow completed successfully');
+        }
+        catch (error) {
+            console.error('❌ Scheduled weekly workflow failed:', error);
+        }
+    }
+    /**
+     * Gets the current scheduler status
+     */
+    getSchedulerStatus() {
+        if (!this.scheduleInterval) {
+            return { isRunning: false };
+        }
+        // Calculate next Sunday
+        const now = new Date();
+        const daysUntilSunday = (7 - now.getDay()) % 7;
+        const nextSunday = new Date(now);
+        nextSunday.setDate(now.getDate() + daysUntilSunday);
+        nextSunday.setHours(2, 0, 0, 0);
+        return {
+            isRunning: true,
+            nextRun: nextSunday.toLocaleString()
+        };
     }
     /**
      * Saves workflow execution to JSON file
@@ -70,7 +153,10 @@ class WorkflowOrchestrator {
                 { name: 'title-validation', status: 'pending' },
                 { name: 'title-addition', status: 'pending' },
                 { name: 'transformation-check', status: 'pending' },
-                { name: 'enhancement-execution', status: 'pending' }
+                { name: 'meal-structure-fix', status: 'pending' },
+                { name: 'enhancement-execution', status: 'pending' },
+                { name: 'enhanced-ingredient-enhancement', status: 'pending' },
+                { name: 'ingredient-structure-fix', status: 'pending' }
             ],
             summary: {
                 totalSteps: 6,
@@ -205,11 +291,20 @@ class WorkflowOrchestrator {
             case 'type-check-and-fix':
                 return await this.executeTypeCheckAndFix(scope);
             case 'title-and-duplication-fix':
-                return await this.executeTitleAndDuplicationFix();
+                return await this.executeTitleAndDuplicationFix(scope);
+            case 'meal-structure-fix':
+                const mealStructureFix = await this.mealService.fixMealStructure();
+                return { mealStructureFix };
             case 'enhancement-execution':
                 const mealEnhancements = await this.mealService.updateMealsWithGeminiEnhancement();
                 const ingredientEnhancements = await this.ingredientService.updateIngredientsWithGeminiEnhancement();
                 return { mealEnhancements, ingredientEnhancements };
+            case 'enhanced-ingredient-enhancement':
+                const enhancedIngredientEnhancements = await this.ingredientService.updateIngredientsWithEnhancedGeminiEnhancement();
+                return { enhancedIngredientEnhancements };
+            case 'ingredient-structure-fix':
+                const ingredientStructureFix = await this.ingredientService.fixIngredientStructure();
+                return { ingredientStructureFix };
             default:
                 throw new Error(`Unknown step: ${stepName}`);
         }
@@ -243,6 +338,8 @@ class WorkflowOrchestrator {
         if (lastAnalysis.ingredients.needsEnhancement.length > 0) {
             recommendations.push(`Enhance ${lastAnalysis.ingredients.needsEnhancement.length} ingredients with missing details`);
         }
+        // Always recommend meal structure fix to ensure consistency
+        recommendations.push('Fix meal structure to match new format (ingredients with units, cookingMethod values, suggestions structure)');
         if (recommendations.length === 0) {
             recommendations.push('All data appears to be in good condition');
         }
@@ -273,7 +370,7 @@ class WorkflowOrchestrator {
      * Executes title and duplication fixes
      * Reads from saved JSON analysis results and fixes titles and duplicates
      */
-    async executeTitleAndDuplicationFix() {
+    async executeTitleAndDuplicationFix(scope = 'all') {
         console.log('🔧 Executing title and duplication fixes...');
         const lastAnalysis = this.dataAnalysisService.getLastAnalysis();
         if (!lastAnalysis) {
@@ -287,7 +384,7 @@ class WorkflowOrchestrator {
         // Fix missing titles
         if (lastAnalysis.meals.withoutTitles > 0) {
             console.log(`📝 Adding titles to ${lastAnalysis.meals.withoutTitles} meals...`);
-            results.titleFixes.meals = await this.mealService.addTitlesToMeals([], 'all');
+            results.titleFixes.meals = await this.mealService.addTitlesToMeals([], scope);
         }
         if (lastAnalysis.ingredients.withoutTitles > 0) {
             console.log(`📝 Adding titles to ${lastAnalysis.ingredients.withoutTitles} ingredients...`);

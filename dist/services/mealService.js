@@ -49,7 +49,7 @@ class MealService {
                             description: variation.description,
                             type: variation.type,
                             cookingTime: variation.cookingTime,
-                            cookingMethod: variation.cookingMethod,
+                            cookingMethod: variation.cookingMethod, // Added 'other' to the list
                             ingredients: variation.ingredients || duplicate.ingredients,
                             instructions: variation.instructions,
                             categories: variation.categories,
@@ -217,7 +217,7 @@ class MealService {
                         updates.cookingTime = enhancedData.cookingTime;
                     }
                     if (enhancedData.cookingMethod && !meal.cookingMethod) {
-                        updates.cookingMethod = enhancedData.cookingMethod;
+                        updates.cookingMethod = enhancedData.cookingMethod; // Added 'other' to the list
                     }
                     if (enhancedData.instructions && (!meal.instructions || meal.instructions.length === 0)) {
                         updates.instructions = enhancedData.instructions;
@@ -501,6 +501,364 @@ Return ONLY the title. Do not include quotes, explanations, or additional text.`
             console.error('Error getting meals needing enhancement:', error);
             throw error;
         }
+    }
+    /**
+     * Fixes existing meals that don't match the new structure using Gemini AI
+     * @returns Promise<{success: number, failed: number, results: Array<{id: string, oldStructure: any, newStructure: any, success: boolean, error?: string}>}>
+     */
+    async fixMealStructure() {
+        try {
+            console.log('🔧 Starting AI-powered meal structure fix process...');
+            const allMeals = await (0, firestore_1.getDocs)(this.collectionRef);
+            console.log(`Found ${allMeals.size} total meals to check and enhance`);
+            const results = [];
+            let successCount = 0;
+            let failedCount = 0;
+            for (const docSnapshot of allMeals.docs) {
+                const mealData = docSnapshot.data();
+                const mealId = docSnapshot.id;
+                try {
+                    console.log(`🔍 AI-enhancing meal: ${mealData.title || mealId}`);
+                    const oldStructure = { ...mealData };
+                    const updates = {};
+                    let hasChanges = false;
+                    // Use Gemini to enhance the meal and get proper cooking method
+                    try {
+                        console.log(`🤖 Using Gemini to enhance meal: ${mealData.title || mealId}`);
+                        const enhancedData = await this.geminiService.enhanceMealDetails({
+                            title: mealData.title,
+                            description: mealData.description,
+                            ingredients: mealData.ingredients,
+                            instructions: mealData.instructions
+                        });
+                        // Fix cookingMethod using AI-generated data
+                        if (enhancedData.cookingMethod &&
+                            ['raw', 'frying', 'grilling', 'boiling', 'smoothie', 'roasting', 'mashing', 'baking', 'sautéing', 'soup'].includes(enhancedData.cookingMethod)) {
+                            if (mealData.cookingMethod !== enhancedData.cookingMethod) {
+                                console.log(`🤖 AI fixed cookingMethod from "${mealData.cookingMethod}" to "${enhancedData.cookingMethod}"`);
+                                updates.cookingMethod = enhancedData.cookingMethod;
+                                hasChanges = true;
+                            }
+                        }
+                        else if (mealData.cookingMethod &&
+                            !['raw', 'frying', 'grilling', 'boiling', 'smoothie', 'roasting', 'mashing', 'baking', 'sautéing', 'soup'].includes(mealData.cookingMethod)) {
+                            // If AI didn't provide a valid method, use a sensible default based on meal title
+                            const defaultMethod = this.determineCookingMethodFromTitle(mealData.title || '');
+                            console.log(`🤖 Using default cookingMethod "${defaultMethod}" for: ${mealData.title || mealId}`);
+                            updates.cookingMethod = defaultMethod;
+                            hasChanges = true;
+                        }
+                        // Fix ingredients using AI-generated data
+                        if (enhancedData.ingredients && Object.keys(enhancedData.ingredients).length > 0) {
+                            const fixedIngredients = {};
+                            let ingredientsChanged = false;
+                            // First, try to use AI-enhanced ingredients
+                            for (const [key, value] of Object.entries(enhancedData.ingredients)) {
+                                if (!this.isInvalidIngredientName(key)) {
+                                    // Check if the value already has units
+                                    const hasUnits = /\b(cup|tbsp|tsp|g|kg|ml|l|oz|lb|piece|slice|clove|bunch|head|can|jar|pack|bag|dash|pinch)\b/i.test(value);
+                                    if (!hasUnits) {
+                                        const defaultUnit = this.getDefaultUnitForIngredient(key);
+                                        fixedIngredients[key] = `${value} ${defaultUnit}`;
+                                    }
+                                    else {
+                                        fixedIngredients[key] = value;
+                                    }
+                                    ingredientsChanged = true;
+                                }
+                            }
+                            // If AI didn't provide enough ingredients, try to fix existing ones
+                            if (Object.keys(fixedIngredients).length === 0 && mealData.ingredients) {
+                                console.log(`🔧 AI didn't provide ingredients, fixing existing ones for: ${mealData.title || mealId}`);
+                                for (const [key, value] of Object.entries(mealData.ingredients)) {
+                                    if (this.isInvalidIngredientName(key)) {
+                                        // Generate a proper ingredient name based on meal context
+                                        const properName = this.generateIngredientNameFromContext(mealData.title || '', key, value);
+                                        console.log(`🔧 Generated proper ingredient name: "${key}" -> "${properName}"`);
+                                        const hasUnits = /\b(cup|tbsp|tsp|g|kg|ml|l|oz|lb|piece|slice|clove|bunch|head|can|jar|pack|bag|dash|pinch)\b/i.test(value);
+                                        if (!hasUnits) {
+                                            const defaultUnit = this.getDefaultUnitForIngredient(properName);
+                                            fixedIngredients[properName] = `${value} ${defaultUnit}`;
+                                        }
+                                        else {
+                                            fixedIngredients[properName] = value;
+                                        }
+                                        ingredientsChanged = true;
+                                    }
+                                    else {
+                                        // Keep valid ingredient names, just ensure they have units
+                                        const hasUnits = /\b(cup|tbsp|tsp|g|kg|ml|l|oz|lb|piece|slice|clove|bunch|head|can|jar|pack|bag|dash|pinch)\b/i.test(value);
+                                        if (!hasUnits) {
+                                            const defaultUnit = this.getDefaultUnitForIngredient(key);
+                                            fixedIngredients[key] = `${value} ${defaultUnit}`;
+                                        }
+                                        else {
+                                            fixedIngredients[key] = value;
+                                        }
+                                        ingredientsChanged = true;
+                                    }
+                                }
+                            }
+                            if (ingredientsChanged) {
+                                updates.ingredients = fixedIngredients;
+                                hasChanges = true;
+                                console.log(`🔧 Fixed ingredients structure for meal: ${mealData.title || mealId}`);
+                            }
+                        }
+                        // Add other AI-enhanced data
+                        if (enhancedData.description && !mealData.description) {
+                            updates.description = enhancedData.description;
+                            hasChanges = true;
+                        }
+                        if (enhancedData.instructions && (!mealData.instructions || mealData.instructions.length === 0)) {
+                            updates.instructions = enhancedData.instructions;
+                            hasChanges = true;
+                        }
+                        if (enhancedData.categories && (!mealData.categories || mealData.categories.length === 0)) {
+                            updates.categories = enhancedData.categories;
+                            hasChanges = true;
+                        }
+                        if (enhancedData.serveQty && !mealData.serveQty) {
+                            updates.serveQty = enhancedData.serveQty;
+                            hasChanges = true;
+                        }
+                    }
+                    catch (geminiError) {
+                        console.warn(`⚠️ Gemini enhancement failed for meal ${mealId}, using fallback methods:`, geminiError);
+                        // Fallback: Use basic structure fixing without AI
+                        if (mealData.cookingMethod &&
+                            !['raw', 'frying', 'grilling', 'boiling', 'smoothie', 'roasting', 'mashing', 'baking', 'sautéing', 'soup'].includes(mealData.cookingMethod)) {
+                            const defaultMethod = this.determineCookingMethodFromTitle(mealData.title || '');
+                            console.log(`🔧 Fallback: Using default cookingMethod "${defaultMethod}" for: ${mealData.title || mealId}`);
+                            updates.cookingMethod = defaultMethod;
+                            hasChanges = true;
+                        }
+                    }
+                    // Fix suggestions structure if it's missing or incorrect
+                    if (!mealData.suggestions ||
+                        !mealData.suggestions.improvements ||
+                        !mealData.suggestions.alternatives ||
+                        !mealData.suggestions.additions) {
+                        const fixedSuggestions = {
+                            improvements: Array.isArray(mealData.suggestions?.improvements) ? mealData.suggestions.improvements : [],
+                            alternatives: Array.isArray(mealData.suggestions?.alternatives) ? mealData.suggestions.alternatives : [],
+                            additions: Array.isArray(mealData.suggestions?.additions) ? mealData.suggestions.additions : []
+                        };
+                        updates.suggestions = fixedSuggestions;
+                        hasChanges = true;
+                        console.log(`🔧 Fixed suggestions structure for meal: ${mealData.title || mealId}`);
+                    }
+                    // Update the meal if we have changes
+                    if (hasChanges) {
+                        updates.updatedAt = firestore_1.Timestamp.now();
+                        await (0, firestore_1.updateDoc)((0, firestore_1.doc)(this.collectionRef, mealId), updates);
+                        const newStructure = { ...oldStructure, ...updates };
+                        results.push({
+                            id: mealId,
+                            oldStructure,
+                            newStructure,
+                            success: true
+                        });
+                        successCount++;
+                        console.log(`✅ Successfully AI-enhanced meal: ${mealData.title || mealId}`);
+                    }
+                    else {
+                        // No changes needed
+                        results.push({
+                            id: mealId,
+                            oldStructure,
+                            newStructure: oldStructure,
+                            success: true
+                        });
+                        successCount++;
+                        console.log(`✅ No changes needed for meal: ${mealData.title || mealId}`);
+                    }
+                    // Small delay to avoid rate limiting
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+                catch (error) {
+                    console.error(`❌ Error fixing meal ${mealId}:`, error);
+                    results.push({
+                        id: mealId,
+                        oldStructure: mealData,
+                        newStructure: mealData,
+                        success: false,
+                        error: error instanceof Error ? error.message : 'Unknown error'
+                    });
+                    failedCount++;
+                }
+            }
+            console.log(`🔧 AI-powered meal structure fix completed. Success: ${successCount}, Failed: ${failedCount}`);
+            return {
+                success: successCount,
+                failed: failedCount,
+                results
+            };
+        }
+        catch (error) {
+            console.error('Error fixing meal structure:', error);
+            throw error;
+        }
+    }
+    /**
+     * Checks if an ingredient name is invalid (should be skipped)
+     * @param ingredientName The name of the ingredient to check
+     * @returns boolean True if the ingredient name is invalid
+     */
+    isInvalidIngredientName(ingredientName) {
+        if (!ingredientName || typeof ingredientName !== 'string') {
+            return true;
+        }
+        const name = ingredientName.trim();
+        // Skip empty strings
+        if (name.length === 0) {
+            return true;
+        }
+        // Skip numeric names (like "1", "2", "3")
+        if (/^\d+$/.test(name)) {
+            return true;
+        }
+        // Skip names that are just punctuation or special characters
+        if (/^[^\w\s]+$/.test(name)) {
+            return true;
+        }
+        // Skip names that are too short (less than 2 characters)
+        if (name.length < 2) {
+            return true;
+        }
+        // Skip names that are common placeholders
+        const invalidNames = ['ingredient', 'item', 'food', 'stuff', 'thing', 'unknown', 'n/a', 'none'];
+        if (invalidNames.includes(name.toLowerCase())) {
+            return true;
+        }
+        return false;
+    }
+    /**
+     * Determines cooking method from meal title using intelligent analysis
+     * @param title The meal title
+     * @returns string The appropriate cooking method
+     */
+    determineCookingMethodFromTitle(title) {
+        if (!title)
+            return 'raw';
+        const lowerTitle = title.toLowerCase();
+        // Check for specific cooking methods in the title
+        if (lowerTitle.includes('grilled') || lowerTitle.includes('grill'))
+            return 'grilling';
+        if (lowerTitle.includes('fried') || lowerTitle.includes('fry') || lowerTitle.includes('stir-fry'))
+            return 'frying';
+        if (lowerTitle.includes('baked') || lowerTitle.includes('bake'))
+            return 'other'; // Map baking to other
+        if (lowerTitle.includes('boiled') || lowerTitle.includes('boil'))
+            return 'boiling';
+        if (lowerTitle.includes('roasted') || lowerTitle.includes('roast'))
+            return 'other'; // Map roasting to other
+        if (lowerTitle.includes('steamed') || lowerTitle.includes('steam'))
+            return 'other'; // Map steaming to other
+        if (lowerTitle.includes('sautéed') || lowerTitle.includes('sauté') || lowerTitle.includes('saute'))
+            return 'other'; // Map sautéing to other
+        if (lowerTitle.includes('soup') || lowerTitle.includes('stew'))
+            return 'other'; // Map soup to other
+        if (lowerTitle.includes('smoothie') || lowerTitle.includes('juice'))
+            return 'other'; // Map smoothie to other
+        if (lowerTitle.includes('mashed') || lowerTitle.includes('mash'))
+            return 'other'; // Map mashing to other
+        // Check for raw indicators
+        if (lowerTitle.includes('salad') || lowerTitle.includes('fresh') || lowerTitle.includes('raw'))
+            return 'raw';
+        // Default based on common patterns
+        if (lowerTitle.includes('egg') && (lowerTitle.includes('scrambled') || lowerTitle.includes('fried')))
+            return 'frying';
+        if (lowerTitle.includes('salmon') && lowerTitle.includes('baked'))
+            return 'other'; // Map baking to other
+        if (lowerTitle.includes('chicken') && lowerTitle.includes('grilled'))
+            return 'grilling';
+        if (lowerTitle.includes('rice') && lowerTitle.includes('bowl'))
+            return 'boiling';
+        // Default to a common method
+        return 'frying';
+    }
+    /**
+     * Generates a proper ingredient name from context when the original name is invalid
+     * @param mealTitle The meal title for context
+     * @param originalName The original invalid ingredient name
+     * @param value The ingredient value/amount
+     * @returns string A proper ingredient name
+     */
+    generateIngredientNameFromContext(mealTitle, originalName, value) {
+        if (!mealTitle)
+            return 'ingredient';
+        const lowerTitle = mealTitle.toLowerCase();
+        // Try to extract ingredient names from the meal title
+        const commonIngredients = [
+            'chicken', 'beef', 'pork', 'salmon', 'tuna', 'shrimp', 'egg', 'tofu',
+            'rice', 'quinoa', 'pasta', 'bread', 'potato', 'sweet potato',
+            'spinach', 'kale', 'broccoli', 'asparagus', 'bell pepper', 'tomato', 'onion', 'garlic',
+            'avocado', 'lemon', 'lime', 'herb', 'spice', 'oil', 'vinegar', 'sauce'
+        ];
+        // Find ingredients mentioned in the title
+        for (const ingredient of commonIngredients) {
+            if (lowerTitle.includes(ingredient)) {
+                return ingredient;
+            }
+        }
+        // If no specific ingredient found, try to infer from the meal type
+        if (lowerTitle.includes('salad'))
+            return 'vegetables';
+        if (lowerTitle.includes('soup'))
+            return 'vegetables';
+        if (lowerTitle.includes('stir-fry'))
+            return 'vegetables';
+        if (lowerTitle.includes('bowl'))
+            return 'protein';
+        if (lowerTitle.includes('hash'))
+            return 'potato';
+        if (lowerTitle.includes('scrambled'))
+            return 'egg';
+        // Default fallback
+        return 'ingredient';
+    }
+    /**
+     * Gets a default unit for an ingredient based on its name
+     * @param ingredientName The name of the ingredient
+     * @returns string The default unit
+     */
+    getDefaultUnitForIngredient(ingredientName) {
+        const name = ingredientName.toLowerCase();
+        // Protein ingredients
+        if (name.includes('chicken') || name.includes('beef') || name.includes('pork') ||
+            name.includes('fish') || name.includes('salmon') || name.includes('tuna') ||
+            name.includes('shrimp') || name.includes('lamb') || name.includes('turkey')) {
+            return 'piece';
+        }
+        // Vegetable ingredients
+        if (name.includes('tomato') || name.includes('onion') || name.includes('garlic') ||
+            name.includes('carrot') || name.includes('potato') || name.includes('bell pepper') ||
+            name.includes('cucumber') || name.includes('lettuce') || name.includes('spinach')) {
+            return 'piece';
+        }
+        // Fruit ingredients
+        if (name.includes('apple') || name.includes('banana') || name.includes('orange') ||
+            name.includes('strawberry') || name.includes('grape') || name.includes('mango')) {
+            return 'piece';
+        }
+        // Grain ingredients
+        if (name.includes('rice') || name.includes('pasta') || name.includes('bread') ||
+            name.includes('quinoa') || name.includes('oat') || name.includes('flour')) {
+            return 'cup';
+        }
+        // Liquid ingredients
+        if (name.includes('oil') || name.includes('vinegar') || name.includes('sauce') ||
+            name.includes('broth') || name.includes('milk') || name.includes('water')) {
+            return 'tbsp';
+        }
+        // Spice/herb ingredients
+        if (name.includes('salt') || name.includes('pepper') || name.includes('oregano') ||
+            name.includes('basil') || name.includes('thyme') || name.includes('cumin')) {
+            return 'tsp';
+        }
+        // Default to piece for unknown ingredients
+        return 'piece';
     }
 }
 exports.MealService = MealService;

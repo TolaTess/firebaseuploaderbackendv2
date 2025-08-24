@@ -33,6 +33,7 @@ export class WorkflowOrchestrator {
   private dataAnalysisService: DataAnalysisService;
   private readonly dataDir = join(process.cwd(), 'data');
   private readonly workflowFile = join(this.dataDir, 'workflow-execution.json');
+  private scheduleInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     this.mealService = new MealService();
@@ -49,6 +50,101 @@ export class WorkflowOrchestrator {
       const fs = require('fs');
       fs.mkdirSync(this.dataDir, { recursive: true });
     }
+  }
+
+  /**
+   * Starts the weekly workflow scheduler (runs every Sunday)
+   */
+  startWeeklyScheduler(): void {
+    if (this.scheduleInterval) {
+      console.log('⚠️ Weekly scheduler is already running');
+      return;
+    }
+
+    console.log('📅 Starting weekly workflow scheduler (Sundays)');
+    
+    // Calculate time until next Sunday
+    const now = new Date();
+    const daysUntilSunday = (7 - now.getDay()) % 7;
+    const nextSunday = new Date(now);
+    nextSunday.setDate(now.getDate() + daysUntilSunday);
+    nextSunday.setHours(2, 0, 0, 0); // Run at 2 AM on Sunday
+
+    const timeUntilNextSunday = nextSunday.getTime() - now.getTime();
+    
+    console.log(`⏰ Next scheduled run: ${nextSunday.toLocaleString()}`);
+    
+    // Schedule the first run
+    setTimeout(() => {
+      this.runScheduledWorkflow();
+      this.scheduleNextSunday();
+    }, timeUntilNextSunday);
+  }
+
+  /**
+   * Schedules the next Sunday run
+   */
+  private scheduleNextSunday(): void {
+    // Schedule for next Sunday at 2 AM
+    const nextSunday = new Date();
+    nextSunday.setDate(nextSunday.getDate() + 7);
+    nextSunday.setHours(2, 0, 0, 0);
+    
+    const timeUntilNextSunday = nextSunday.getTime() - Date.now();
+    
+    this.scheduleInterval = setTimeout(() => {
+      this.runScheduledWorkflow();
+      this.scheduleNextSunday(); // Schedule the next one
+    }, timeUntilNextSunday);
+    
+    console.log(`⏰ Next scheduled run: ${nextSunday.toLocaleString()}`);
+  }
+
+  /**
+   * Stops the weekly workflow scheduler
+   */
+  stopWeeklyScheduler(): void {
+    if (this.scheduleInterval) {
+      clearTimeout(this.scheduleInterval);
+      this.scheduleInterval = null;
+      console.log('⏹️ Weekly workflow scheduler stopped');
+    } else {
+      console.log('⚠️ No scheduler running');
+    }
+  }
+
+  /**
+   * Runs the scheduled workflow
+   */
+  private async runScheduledWorkflow(): Promise<void> {
+    console.log('🕐 Running scheduled weekly workflow...');
+    try {
+      await this.executeCompleteWorkflow('all');
+      console.log('✅ Scheduled weekly workflow completed successfully');
+    } catch (error) {
+      console.error('❌ Scheduled weekly workflow failed:', error);
+    }
+  }
+
+  /**
+   * Gets the current scheduler status
+   */
+  getSchedulerStatus(): { isRunning: boolean; nextRun?: string } {
+    if (!this.scheduleInterval) {
+      return { isRunning: false };
+    }
+
+    // Calculate next Sunday
+    const now = new Date();
+    const daysUntilSunday = (7 - now.getDay()) % 7;
+    const nextSunday = new Date(now);
+    nextSunday.setDate(now.getDate() + daysUntilSunday);
+    nextSunday.setHours(2, 0, 0, 0);
+
+    return {
+      isRunning: true,
+      nextRun: nextSunday.toLocaleString()
+    };
   }
 
   /**
