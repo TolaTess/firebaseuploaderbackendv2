@@ -82,7 +82,7 @@ class WorkflowOrchestrator {
     async runScheduledWorkflow() {
         console.log('🕐 Running scheduled weekly workflow...');
         try {
-            await this.executeCompleteWorkflow('all');
+            await this.executeCompleteWorkflow('last7days');
             console.log('✅ Scheduled weekly workflow completed successfully');
         }
         catch (error) {

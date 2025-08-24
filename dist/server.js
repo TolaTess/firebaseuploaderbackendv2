@@ -472,7 +472,7 @@ const scheduleJobs = () => {
         orchestrator.startWeeklyScheduler();
         console.log('✅ Weekly workflow scheduler started successfully');
         console.log('📅 Schedule: Every Sunday at 2 AM');
-        console.log('🎯 Scope: Complete workflow execution with scope "all"');
+        console.log('🎯 Scope: Weekly workflow execution with scope "last7days"');
     }
     catch (error) {
         console.error('❌ Failed to start weekly workflow scheduler:', error);
@@ -489,7 +489,8 @@ app.post('/api/scheduler/start', async (req, res) => {
         res.json({
             success: true,
             message: 'Weekly scheduler started successfully',
-            schedule: 'Every Sunday at 2 AM'
+            schedule: 'Every Sunday at 2 AM',
+            scope: 'last7days'
         });
     }
     catch (error) {
@@ -537,11 +538,12 @@ app.post('/api/scheduler/run-now', async (req, res) => {
         console.log('Manual weekly workflow execution requested');
         const { WorkflowOrchestrator } = await Promise.resolve().then(() => __importStar(require('./services/workflowOrchestrator')));
         const orchestrator = new WorkflowOrchestrator();
-        // Execute the complete workflow immediately
-        const result = await orchestrator.executeCompleteWorkflow('all');
+        // Execute the weekly workflow immediately with last7days scope
+        const result = await orchestrator.executeCompleteWorkflow('last7days');
         res.json({
             success: true,
             message: 'Weekly workflow executed successfully',
+            scope: 'last7days',
             result: result.summary,
             timestamp: new Date().toISOString()
         });

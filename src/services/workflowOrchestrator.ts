@@ -119,7 +119,7 @@ export class WorkflowOrchestrator {
   private async runScheduledWorkflow(): Promise<void> {
     console.log('🕐 Running scheduled weekly workflow...');
     try {
-      await this.executeCompleteWorkflow('all');
+      await this.executeCompleteWorkflow('last7days');
       console.log('✅ Scheduled weekly workflow completed successfully');
     } catch (error) {
       console.error('❌ Scheduled weekly workflow failed:', error);
